@@ -1,0 +1,35 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "CommonJS",
+    "moduleResolution": "node",
+    "esModuleInterop": true,
+    "strict": true,
+    "outDir": "dist-server",
+    "rootDir": ".",
+    "baseUrl": ".",
+    "paths": {
+      "@/*": [
+        "src/*"
+      ]
+    },
+    "skipLibCheck": true,
+    "sourceMap": true,
+    "resolveJsonModule": true
+  },
+  "include": [
+    "runtime/**/*.ts",
+    "src/lib/**/*.ts",
+    "src/types/**/*.ts",
+    "server.ts"
+  ],
+  "exclude": [
+    "node_modules",
+    "src/app/**",
+    "src/components/**",
+    "src/hooks/**",
+    "src/stores/**",
+    "**/*.spec.ts",
+    "**/*.test.ts"
+  ]
+}

@@ -1,0 +1,189 @@
+/**
+ * Electron server child process.
+ * Mirrors server.ts with IPC signaling for Electron main process coordination.
+ * This file runs in a forked child process — NOT in the Electron main process.
+ */
+import '../runtime/register-runtime-aliases';
+import next from 'next';
+import { createServer } from 'http';
+import { initDatabase } from '../src/lib/db/database';
+import '../src/lib/cli/providers/bootstrap';
+import { ensureRSAKeys } from '../src/lib/auth/keys';
+import { wsServer } from '../src/lib/ws/server';
+import { processManager } from '../src/lib/cli/process-manager';
+import { getAgentEnvironment } from '../src/lib/cli/spawn-cli';
+import { getElectronAuthUserId } from '../src/lib/auth/electron-user';
+import { rateLimitPoller } from '../src/lib/rate-limit/poller';
+import { prewarmCliStatusSnapshot } from '../src/lib/cli/provider-status-prewarm';
+import { snapshotTelemetryStartupDataState } from '../src/lib/telemetry/server-state';
+import logger from '../src/lib/logger';
+import { getTesseraDataPath } from '../src/lib/tessera-data-dir';
+
+process.env.ELECTRON_CHILD = '1';
+process.env.TESSERA_ELECTRON_SERVER = '1';
+process.env.TESSERA_PRODUCTION_DB = '1';
+snapshotTelemetryStartupDataState();
+
+const dev = process.env.NODE_ENV !== 'production';
+const hostname = '127.0.0.1';
+const port = parseInt(process.env.PORT || '3000', 10);
+// In packaged apps, cwd must be a real directory while Next should still resolve
+// assets from the packaged app root (typically resources/app.asar).
+const dir = process.env.TESSERA_APP_ROOT || process.cwd();
+
+import * as fs from 'fs';
+import * as path from 'path';
+const STARTUP_LOG = getTesseraDataPath('startup.log');
+type StartupLogLevel = 'debug' | 'error' | 'fatal';
+const STARTUP_LOG_LEVEL_WEIGHT: Record<StartupLogLevel, number> = {
+  debug: 10,
+  error: 40,
+  fatal: 50,
+};
+
+function normalizeStartupLogLevel(value: string | undefined): StartupLogLevel | null {
+  if (!value) return null;
+  const normalized = value.toLowerCase();
+  if (normalized === 'fatal') return 'fatal';
+  if (normalized === 'error') return 'error';
+  if (normalized === 'debug' || normalized === 'info' || normalized === 'warn') return 'debug';
+  return null;
+}
+
+const STARTUP_LOG_LEVEL =
+  normalizeStartupLogLevel(process.env.TESSERA_ELECTRON_LOG_LEVEL) ??
+  normalizeStartupLogLevel(process.env.LOG_LEVEL) ??
+  (process.env.NODE_ENV === 'production' ? 'error' : 'debug');
+
+function logStartup(level: StartupLogLevel, msg: string) {
+  if (STARTUP_LOG_LEVEL_WEIGHT[level] < STARTUP_LOG_LEVEL_WEIGHT[STARTUP_LOG_LEVEL]) {
+    return;
+  }
+  fs.mkdirSync(path.dirname(STARTUP_LOG), { recursive: true });
+  fs.appendFileSync(STARTUP_LOG, `[${new Date().toISOString()}] [${level.toUpperCase()}] ${msg}\n`);
+}
+
+logStartup('debug', `Server child starting (cwd=${process.cwd()}, dir=${dir}, port=${port})`);
+
+initDatabase().then(() => {
+  logStartup('debug', 'DB initialized, calling ensureRSAKeys...');
+  return ensureRSAKeys();
+}).then(async () => {
+  logStartup('debug', 'RSA keys ensured, creating server and calling app.prepare...');
+  prewarmCliStatusSnapshot('electron-server-child');
+
+  // Create HTTP server first so Next.js can attach its HMR upgrade handler.
+  const server = createServer();
+
+  const app = next({ dev, hostname, port, dir, httpServer: server } as Parameters<typeof next>[0]);
+  const handle = app.getRequestHandler();
+
+  await app.prepare();
+
+  // Attach request handler after Next.js is prepared
+  server.on('request', (req, res) => {
+    handle(req, res);
+  });
+
+  server.listen(port, hostname, () => {
+    wsServer.start(server);
+    rateLimitPoller.setBroadcast((msg) => wsServer.broadcast(msg));
+    rateLimitPoller.setEnvironmentResolver(async () => {
+      const userId = await getElectronAuthUserId();
+      return getAgentEnvironment(userId);
+    });
+    rateLimitPoller.start();
+
+    logger.info({ port, hostname, env: process.env.NODE_ENV }, 'Electron server started');
+    console.log(`> Ready on http://${hostname}:${port}`);
+    console.log(`> WebSocket on ws://${hostname}:${port}/ws`);
+
+    // Signal readiness to Electron main process
+    if (process.send) {
+      process.send({ type: 'ready', port });
+    }
+  });
+
+  // ── Graceful shutdown ─────────────────────────────────────────────────
+  let isShuttingDown = false;
+  const shutdown = async () => {
+    if (isShuttingDown) return;
+    isShuttingDown = true;
+
+    const forceShutdownTimer = setTimeout(() => {
+      logger.error('Forced shutdown after timeout');
+      process.exit(1);
+    }, 10_000);
+
+    logger.info('Shutting down server...');
+
+    try {
+      logger.info('Closing WebSocket connections...');
+      await wsServer.shutdown();
+
+      logger.info('Stopping rate limit poller...');
+      rateLimitPoller.stop();
+
+      logger.info('Cleaning up CLI processes...');
+      await processManager.cleanup();
+    } catch (error) {
+      clearTimeout(forceShutdownTimer);
+      logger.error({ error }, 'Server shutdown cleanup failed');
+      process.exit(1);
+    }
+
+    server.close((error?: Error) => {
+      clearTimeout(forceShutdownTimer);
+      if (error) {
+        logger.error({ error }, 'HTTP server close failed');
+        process.exit(1);
+        return;
+      }
+      logger.info('HTTP server closed');
+      process.exit(0);
+    });
+
+    server.closeIdleConnections?.();
+    setTimeout(() => {
+      server.closeAllConnections?.();
+    }, 1_000);
+  };
+
+  // IPC shutdown from Electron main process
+  process.on('message', (msg: { type: string }) => {
+    if (msg?.type === 'shutdown') {
+      shutdown();
+    }
+  });
+
+  // Fallback signals for non-Electron usage
+  process.on('SIGINT', shutdown);
+  process.on('SIGTERM', shutdown);
+
+  process.on('unhandledRejection', (reason) => {
+    logger.error({ reason, reasonType: typeof reason }, 'Unhandled Rejection');
+  });
+
+  process.on('uncaughtException', (error) => {
+    const msg = error.message || '';
+    const isWorkerError =
+      msg.includes('the worker has exited') ||
+      msg.includes('the worker thread exited') ||
+      msg.includes('vendor-chunks/lib/worker.js');
+
+    if (dev && isWorkerError) {
+      logger.warn({ error: msg }, 'Next.js dev worker error (non-fatal)');
+      return;
+    }
+
+    logger.error({ error: msg, stack: error.stack }, 'Uncaught Exception');
+    shutdown();
+  });
+}).catch((err) => {
+  logStartup('fatal', `FATAL ERROR: ${err}`);
+  if (process.send) {
+    process.send({ type: 'error', message: String(err) });
+  }
+  console.error('Failed to prepare Next.js app:', err);
+  process.exit(1);
+});
