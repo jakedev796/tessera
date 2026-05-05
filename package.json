@@ -5,7 +5,7 @@
   "private": false,
   "license": "Apache-2.0",
   "author": {
-    "name": "Horang Labs"
+    "name": "Horang Labs, Inc."
   },
   "repository": {
     "type": "git",
@@ -134,7 +134,7 @@
   "build": {
     "appId": "app.tessera.desktop",
     "productName": "Tessera",
-    "copyright": "Open Source",
+    "copyright": "Copyright (c) 2026 Horang Labs, Inc.",
     "afterPack": "scripts/electron-after-pack.cjs",
     "npmRebuild": false,
     "asar": true,

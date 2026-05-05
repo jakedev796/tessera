@@ -315,6 +315,8 @@ If you start Tessera with `TESSERA_DATA_DIR`, remove the `auth/` directory under
 
 Tessera is open source under the Apache License 2.0 (`Apache-2.0`).
 
+Copyright (c) 2026 Horang Labs, Inc.
+
 See the [LICENSE](LICENSE) file for the full text.
 
 Claude Code is a trademark of Anthropic. Codex and OpenAI are trademarks of OpenAI. Tessera is not affiliated with or endorsed by Anthropic or OpenAI.
