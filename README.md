@@ -77,10 +77,10 @@ Choose the runtime that fits your setup:
 | Runtime | How to run |
 |---------|------------|
 | Windows desktop | Download the portable `.exe` from [GitHub Releases](https://github.com/horang-labs/tessera/releases) |
-| macOS Apple Silicon | Download the `.dmg` from [GitHub Releases](https://github.com/horang-labs/tessera/releases) |
+| macOS desktop | Download the `.dmg` from [GitHub Releases](https://github.com/horang-labs/tessera/releases) |
 | Browser | Install the npm CLI and open the printed local URL |
 
-macOS release DMGs are Developer ID signed and notarized when the release workflow has Apple signing secrets configured. See [Desktop Releases](#desktop-releases).
+macOS release DMGs are Developer ID signed and notarized. Windows portable `.exe` builds are not code-signed yet, so Windows SmartScreen may show an unknown-publisher warning. See [Desktop Releases](#desktop-releases).
 
 For the browser runtime:
 
@@ -208,10 +208,7 @@ Desktop release builds use Electron:
 | Target | Command |
 |--------|---------|
 | Windows portable `.exe` | `npm run electron:build:win` |
-| macOS Apple Silicon `.dmg` | `npm run electron:build:mac-arm64` |
-| signed macOS Apple Silicon `.dmg` | `npm run electron:build:mac-arm64:signed` |
-| signed macOS Intel `.dmg` | `npm run electron:build:mac-x64:signed` |
-| signed macOS Intel + Apple Silicon `.dmg` | `npm run electron:build:mac:signed` |
+| macOS Apple Silicon dev `.dmg` | `npm run electron:build:mac-arm64` |
 
 Electron build outputs are written under `release/`.
 
@@ -256,14 +253,14 @@ Provider requests are handled by the provider CLIs installed on your machine. Te
 
 Desktop release assets are built by GitHub Actions for `v*` tags and attached to GitHub Releases:
 
-- Windows portable `.exe`
-- macOS `.dmg` for Apple Silicon and Intel
+- Windows portable `.exe` (not code-signed yet)
+- macOS `.dmg` for Apple Silicon and Intel, Developer ID signed and notarized
 
-macOS release builds use Developer ID signing, hardened runtime entitlements, Apple notarization, and DMG stapling when the release workflow has the required Apple secrets. Local unsigned macOS builds are still available through `npm run electron:build:mac-arm64` and `npm run electron:build:mac-x64` for development only.
+macOS release DMGs are signed and notarized with Apple Developer ID, so downloaded releases should open normally on macOS.
 
-On Windows, SmartScreen may show an unknown-publisher warning. Choose **More info** and then **Run anyway** to start Tessera.
+Windows release builds are portable `.exe` files and are not code-signed yet. SmartScreen may show an unknown-publisher warning; choose **More info** and then **Run anyway** to start Tessera.
 
-On macOS, signed and notarized DMGs should open without the unsigned-developer approval flow. If Gatekeeper blocks a macOS release asset, treat it as a release-signing failure and rebuild from the signed macOS workflow.
+If Gatekeeper still blocks a macOS release DMG, please report it as a release-signing issue.
 
 See [macOS Distribution](docs/MACOS_DISTRIBUTION.md) for local and CI setup.
 
@@ -322,4 +319,4 @@ See the [LICENSE](LICENSE) file for the full text.
 
 Claude Code is a trademark of Anthropic. Codex and OpenAI are trademarks of OpenAI. Tessera is not affiliated with or endorsed by Anthropic or OpenAI.
 
-[design-partner-waitlist]: https://github.com/horang-labs/tessera/issues/new?title=Tessera%20for%20Teams%20design%20partner&body=Company%20or%20team%3A%0ATeam%20size%3A%0ARole%3A%0ACoding%20agents%20you%20use%3A%20Claude%20Code%20/%20Codex%20/%20Cursor%20/%20Other%0ATeam%20needs%3A%20Shared%20workspace%20/%20Self-hosted%20/%20SSO%20/%20Audit%20logs%20/%20GitHub%20integration%20/%20Other%0AOkay%20to%20contact%20you%20for%20a%20short%20design-partner%20call%3A%20Yes%20/%20No
+[design-partner-waitlist]: https://docs.google.com/forms/d/e/1FAIpQLSdbo5haZdekBrQNwt_F-UlloQu-s4SkUV4tZCU0cONwKJX8Tw/viewform
