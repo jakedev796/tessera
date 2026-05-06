@@ -1,6 +1,6 @@
 ---
 name: Bug report
-about: Report something that is broken or behaving unexpectedly
+about: Report something broken or unexpected
 title: "[Bug]: "
 labels: bug
 assignees: ""
@@ -11,22 +11,18 @@ assignees: ""
 
 ## Steps to reproduce
 
-1. 
-2. 
-3. 
-
-## Expected behavior
-
+1.
+2.
+3.
 
 ## Environment
 
+- Tessera version:
+- Runtime: Windows desktop / macOS desktop / npm / source
 - OS:
-- Node.js:
-- Tessera commit/version:
-- CLI provider:
-- CLI version:
+- CLI/provider, if relevant:
+- Node.js, npm/source only:
 
-## Logs or screenshots
+## Screenshots or logs
 
-Remove secrets, local paths, and private project details before attaching logs.
-
+Remove secrets, private prompts, local paths, tokens, and repository names before attaching logs.

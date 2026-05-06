@@ -1,20 +1,13 @@
 ---
 name: Feature request
-about: Suggest an improvement or new capability
+about: Suggest an improvement or new workflow
 title: "[Feature]: "
 labels: enhancement
 assignees: ""
 ---
 
-## Problem
+## What do you want to improve?
 
 
-## Proposed solution
-
-
-## Alternatives considered
-
-
-## Additional context
-
+## Context or screenshots
 

@@ -71,8 +71,7 @@ For UI changes, include screenshots or a short recording. For desktop/runtime ch
 
 Open an issue with:
 
-- The OS and Node.js version.
-- Which CLI provider you used.
-- Steps to reproduce.
-- Expected vs. actual behavior.
-- Logs or screenshots with secrets removed.
+- What happened and how to reproduce it.
+- Tessera version, runtime, and OS.
+- Node.js version only for npm or source installs.
+- Logs or screenshots if helpful, with secrets removed.
