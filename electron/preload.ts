@@ -26,6 +26,33 @@ contextBridge.exposeInMainWorld('electronAPI', {
     section: 'file' | 'edit' | 'view' | 'window' | 'help',
     anchor: { x: number; y: number }
   ) => ipcRenderer.invoke('titlebar-popup-menu', section, anchor),
+  openBoardWindow: () => ipcRenderer.invoke('open-board-window'),
+  closeBoardPopouts: () => ipcRenderer.invoke('close-board-popouts'),
+  getPopoutState: () => ipcRenderer.invoke('get-popout-state'),
+  onPopoutStateChanged: (callback: (count: number) => void) => {
+    const listener = (_event: Electron.IpcRendererEvent, payload: { count?: number }) => {
+      if (typeof payload?.count === 'number') {
+        callback(payload.count);
+      }
+    };
+    ipcRenderer.on('popout-state-changed', listener);
+    return () => {
+      ipcRenderer.removeListener('popout-state-changed', listener);
+    };
+  },
+  popoutOpenSession: (sessionId: string) =>
+    ipcRenderer.send('popout-open-session', sessionId),
+  onPopoutOpenSession: (callback: (sessionId: string) => void) => {
+    const listener = (_event: Electron.IpcRendererEvent, payload: { sessionId?: string }) => {
+      if (typeof payload?.sessionId === 'string') {
+        callback(payload.sessionId);
+      }
+    };
+    ipcRenderer.on('popout-open-session', listener);
+    return () => {
+      ipcRenderer.removeListener('popout-open-session', listener);
+    };
+  },
   onTitlebarMenuCommand: (callback: (command: string) => void) => {
     const listener = (_event: Electron.IpcRendererEvent, payload: { command?: string }) => {
       if (typeof payload?.command === 'string') {
