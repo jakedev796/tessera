@@ -29,15 +29,15 @@ npm install
 Run the local development server:
 
 ```bash
-npm run dev
+NODE_ENV=development PORT=3100 npx tsx server.ts
 ```
 
-The `dev` script runs Tessera's custom `server.ts` runtime in development mode on port `3100` by default. Do not run `next dev` directly for local development.
+Tessera uses the custom `server.ts` runtime. Do not run `next dev` directly for local development.
 
 To run on a different port:
 
 ```bash
-PORT=32124 npm run dev
+NODE_ENV=development PORT=32124 npx tsx server.ts
 ```
 
 ## Checks
