@@ -1,8 +1,7 @@
-import { spawn } from 'child_process';
 import { existsSync, readFileSync } from 'fs';
 import { getRuntimePlatform } from '../system/runtime-platform';
 import { getSpawnCliCache } from './spawn-cli-cache';
-import { buildSpawnEnvironment } from './spawn-cli-runtime';
+import { spawnCliProcess } from './spawn-cli-runtime';
 
 export interface ExecResult {
   /** True iff the process closed with exit code 0 AND did not time out. */
@@ -48,22 +47,11 @@ export function __resetWslDetectionCacheForTests(): void {
   _wslDetectionCache = undefined;
 }
 
-function quoteBashArg(value: string): string {
-  return `'${value.replace(/'/g, `'\\''`)}'`;
-}
-
-function buildBashExecScript(command: string, args: string[]): string {
-  return ['exec', quoteBashArg(command), ...args.map(quoteBashArg)].join(' ');
-}
-
 /**
  * Runs a CLI binary with a hard timeout, capturing stdout/stderr as strings.
  *
- * Routing:
- *   - server=Windows native, env=wsl  → `wsl bash -lic 'exec <command> <args...>'`
- *   - server=WSL, env=native          → `cmd.exe /c "<command> <args>"`
- *     (reaches the Windows host's PATH via WSL interop)
- *   - otherwise                       → `spawn(command, args)` directly
+ * Routing is delegated to spawn-cli-runtime so status probes and real sessions
+ * resolve Windows npm shims (`*.cmd`, `*.ps1`) the same way.
  *
  * Never throws — all failure modes map to `{ ok: false, ... }`.
  */
@@ -73,42 +61,12 @@ export async function execCli(
   environment: CliEnvironment,
   timeoutMs: number,
 ): Promise<ExecResult> {
-  const onWin32 = getRuntimePlatform() === 'win32';
-  const onWsl = !onWin32 && isRunningInWsl();
-
-  let spawnCommand: string;
-  let spawnArgs: string[];
-
-  if (onWin32 && environment === 'wsl') {
-    spawnCommand = 'wsl';
-    // Match WSL session spawning so status checks see the same PATH a user
-    // gets from their WSL shell.
-    spawnArgs = ['bash', '-lic', buildBashExecScript(command, args)];
-  } else if (onWsl && environment === 'native') {
-    // cmd.exe /c takes a single command string. Our callers only run
-    // fixed verbs like `claude --version` with no user input, so a
-    // simple space-join is safe. Do NOT shell-escape — it would mangle
-    // the expected argv on the Windows side.
-    spawnCommand = 'cmd.exe';
-    spawnArgs = ['/c', [command, ...args].join(' ')];
-  } else {
-    // Native on the server's own platform, including the WSL self-check
-    // (env=wsl when the server itself runs in WSL).
-    spawnCommand = command;
-    spawnArgs = args;
-  }
-
-  // Finder/Dock-launched macOS apps do not inherit the user's login-shell PATH.
-  // Use the same PATH reconstruction as real CLI spawns so status probes and
-  // provider pickers see CLIs installed by Homebrew, npm, pnpm, etc.
-  const env = buildSpawnEnvironment(process.env, getSpawnCliCache());
-
   return new Promise((resolve) => {
-    const proc = spawn(spawnCommand, spawnArgs, {
+    const proc = spawnCliProcess(command, args, {
       windowsHide: true,
-      env,
+      env: process.env,
       stdio: ['ignore', 'pipe', 'pipe'],
-    });
+    }, environment, getSpawnCliCache());
 
     let stdout = '';
     let stderr = '';
