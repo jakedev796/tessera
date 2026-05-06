@@ -1,48 +1,30 @@
 # Contributing to Tessera
 
-Thanks for your interest in contributing. Tessera is still early and moving quickly, so the easiest contributions to review are small, focused, and tied to a concrete issue or workflow.
+Thanks for your interest in Tessera. Small, focused issues and pull requests are the easiest to review.
 
-## Good Contributions
+## Issues
 
-- Clear bug reports with reproduction steps, logs, screenshots, or short screen recordings.
-- Platform fixes for Windows, WSL, macOS, and the npm/browser runtime.
-- Documentation improvements, setup notes, troubleshooting tips, and README fixes.
-- Small UI polish with before/after screenshots.
-- Provider-specific fixes that preserve the native behavior of Claude Code, Codex, or OpenCode.
+Use the bug or feature template. Screenshots, recordings, and clear reproduction steps are especially helpful. For npm or source installs, include Node.js only when it seems relevant.
 
-## Before You Start
+## Pull Requests
 
-- For bugs, open an issue with the environment details and reproduction steps.
-- For larger features, new provider integrations, workflow changes, or architecture changes, open an issue first so we can align on the approach.
-- Open pull requests against `main` unless a maintainer asks otherwise.
-- Keep pull requests focused. Avoid unrelated refactors, broad formatting-only changes, or mixing several features into one PR.
-- Do not include secrets, private prompts, API keys, tokens, private repository names, or sensitive logs in issues or PRs.
+- Open pull requests against `main`.
+- Keep changes focused.
+- Open an issue first for larger features, new provider integrations, workflow changes, or architecture changes.
+- Do not include secrets, private prompts, API keys, tokens, private repository names, or sensitive logs.
 
-## Development Setup
-
-Install dependencies:
+## Source Setup
 
 ```bash
 npm install
-```
-
-Run the local development server:
-
-```bash
 npm run dev
 ```
 
-The `dev` script runs Tessera's custom `server.ts` runtime in development mode on port `3100` by default. Do not run `next dev` directly for local development.
-
-To run on a different port:
-
-```bash
-PORT=32124 npm run dev
-```
+The dev server runs through `server.ts` on port `3100` by default. Do not run `next dev` directly.
 
 ## Checks
 
-Before opening a PR, run the checks that match your change:
+For code changes, run the checks that match your change:
 
 ```bash
 npm run lint
@@ -50,28 +32,10 @@ npx tsc --noEmit
 NODE_ENV=production npm run build
 ```
 
-For UI changes, include screenshots or a short recording. For desktop/runtime changes, mention the OS and runtime you tested.
+For UI changes, include screenshots or a short recording.
 
 ## Code Guidelines
 
 - Keep provider-specific behavior behind the CLI provider interfaces.
 - Prefer existing local patterns over new abstractions.
-- Keep React components functional and typed.
 - Avoid broad refactors in feature or bugfix PRs.
-- Do not commit local data, credentials, generated caches, or private QA output.
-
-## Pull Request Guidelines
-
-- Explain what changed and why.
-- Link the issue when there is one.
-- Include test notes, even if the note is "not tested" with a reason.
-- Keep the PR small enough to review in one pass when possible.
-
-## Reporting Bugs
-
-Open an issue with:
-
-- What happened and how to reproduce it.
-- Tessera version, runtime, and OS.
-- Node.js version only for npm or source installs.
-- Logs or screenshots if helpful, with secrets removed.
