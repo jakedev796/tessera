@@ -23,6 +23,7 @@ Open source | Claude Code + Codex + OpenCode | Full CLI workflows in UI | From i
 | [npm package](https://www.npmjs.com/package/@horang-labs/tessera) | Install the browser runtime |
 | [Product Hunt launch][product-hunt] | Support Tessera on Product Hunt |
 | [Team design partner waitlist][design-partner-waitlist] | Help shape team workspaces, permissions, and enterprise adoption |
+| [Contributing][contributing] | Report issues, discuss larger changes, and send focused PRs |
 | [GitHub Issues](https://github.com/horang-labs/tessera/issues) | Report bugs, rough edges, and feature ideas |
 
 | Use Tessera to | Instead of |
@@ -324,3 +325,4 @@ Claude Code is a trademark of Anthropic. Codex and OpenAI are trademarks of Open
 
 [design-partner-waitlist]: https://docs.google.com/forms/d/e/1FAIpQLSdbo5haZdekBrQNwt_F-UlloQu-s4SkUV4tZCU0cONwKJX8Tw/viewform
 [product-hunt]: https://www.producthunt.com/posts/tessera-6
+[contributing]: CONTRIBUTING.md
