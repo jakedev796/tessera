@@ -5,7 +5,8 @@
 ## Testing
 
 - [ ] `npm run lint`
-- [ ] `npm run build`
+- [ ] `npx tsc --noEmit`
+- [ ] `NODE_ENV=production npm run build`
 - [ ] Manual test:
 - [ ] Not tested:
 

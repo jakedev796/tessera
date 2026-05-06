@@ -46,10 +46,19 @@ Before opening a PR, run the checks that match your change:
 
 ```bash
 npm run lint
-npm run build
+npx tsc --noEmit
+NODE_ENV=production npm run build
 ```
 
 For UI changes, include screenshots or a short recording. For desktop/runtime changes, mention the OS and runtime you tested.
+
+## Code Guidelines
+
+- Keep provider-specific behavior behind the CLI provider interfaces.
+- Prefer existing local patterns over new abstractions.
+- Keep React components functional and typed.
+- Avoid broad refactors in feature or bugfix PRs.
+- Do not commit local data, credentials, generated caches, or private QA output.
 
 ## Pull Request Guidelines
 
@@ -57,3 +66,13 @@ For UI changes, include screenshots or a short recording. For desktop/runtime ch
 - Link the issue when there is one.
 - Include test notes, even if the note is "not tested" with a reason.
 - Keep the PR small enough to review in one pass when possible.
+
+## Reporting Bugs
+
+Open an issue with:
+
+- The OS and Node.js version.
+- Which CLI provider you used.
+- Steps to reproduce.
+- Expected vs. actual behavior.
+- Logs or screenshots with secrets removed.

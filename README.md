@@ -270,7 +270,7 @@ See [macOS Distribution](docs/MACOS_DISTRIBUTION.md) for local and CI setup.
 
 ## Status
 
-Tessera is currently published as a beta. Ideas, bug reports, usability feedback, and feature requests are welcome through GitHub Issues, and we actively review them while Tessera evolves. External code contributions are not being accepted yet while the project structure and review process settle.
+Tessera is currently published as a beta. Ideas, bug reports, usability feedback, feature requests, and focused pull requests are welcome through GitHub Issues and pull requests. For larger features, new provider integrations, workflow changes, or architecture changes, please open an issue first so we can align on the approach.
 
 ## Teams And Design Partners
 
