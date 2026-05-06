@@ -9,6 +9,7 @@ export type EnterKeyBehavior = 'send' | 'newline';
 export type SttEngine = 'webSpeech' | 'gemini';
 export type AgentEnvironment = 'native' | 'wsl';
 export type WindowsCloseBehavior = 'ask' | 'tray' | 'quit';
+export type CliCommandOverrides = Record<string, Partial<Record<AgentEnvironment, string>>>;
 
 export interface SetupState {
   dismissedAt: string | null;
@@ -59,6 +60,7 @@ export interface UserSettings {
   geminiApiKey: string;
   favoriteSkills: string[];
   agentEnvironment: AgentEnvironment;
+  cliCommandOverrides: CliCommandOverrides;
   windowsCloseBehavior: WindowsCloseBehavior;
   setup: SetupState;
   telemetry: TelemetrySettings;

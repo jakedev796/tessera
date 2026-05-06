@@ -26,11 +26,14 @@ import { claudeCodeProtocolParser } from './protocol-parser';
 import { isBinaryAvailable } from '../registry';
 import { getAgentEnvironment, spawnCli } from '../../spawn-cli';
 import { execCli, parseVersion, probeBinaryAvailable } from '../../cli-exec';
+import { resolveProviderCliCommand } from '../../provider-command';
 import { getRuntimePlatform } from '@/lib/system/runtime-platform';
 import logger from '@/lib/logger';
 
 const CLI_TIMEOUT_MS = 120_000;
 const STATUS_CHECK_TIMEOUT_MS = 5_000;
+const PROVIDER_ID = 'claude-code';
+const DEFAULT_COMMAND = 'claude';
 
 // =============================================================================
 // ClaudeCodeAdapter
@@ -41,7 +44,7 @@ export class ClaudeCodeAdapter implements CliProvider {
    * Returns the unique machine-readable identifier for this provider.
    */
   getProviderId(): string {
-    return 'claude-code';
+    return PROVIDER_ID;
   }
 
   /**
@@ -69,15 +72,21 @@ export class ClaudeCodeAdapter implements CliProvider {
    * does not make provider pickers wait for both commands serially.
    */
   async checkStatus(options: CheckStatusOptions): Promise<CliStatusResult> {
+    const command = await resolveProviderCliCommand(
+      PROVIDER_ID,
+      DEFAULT_COMMAND,
+      options.environment,
+      options.userId,
+    );
     const [versionResult, authResult] = await Promise.all([
       execCli(
-        'claude',
+        command,
         ['--version'],
         options.environment,
         STATUS_CHECK_TIMEOUT_MS,
       ),
       execCli(
-        'claude',
+        command,
         ['auth', 'status'],
         options.environment,
         STATUS_CHECK_TIMEOUT_MS,
@@ -159,8 +168,9 @@ export class ClaudeCodeAdapter implements CliProvider {
     // and disables adaptive thinking, which breaks --effort on Opus/Sonnet 4.6.
     delete spawnEnv.MAX_THINKING_TOKENS;
     const agentEnv = await getAgentEnvironment(options.userId);
+    const command = await resolveProviderCliCommand(PROVIDER_ID, DEFAULT_COMMAND, agentEnv, options.userId);
 
-    const cliProcess = spawnCli('claude', args, {
+    const cliProcess = spawnCli(command, args, {
       cwd: workDir,
       shell: false,
       env: spawnEnv as NodeJS.ProcessEnv,
@@ -265,6 +275,7 @@ export class ClaudeCodeAdapter implements CliProvider {
    */
   private async _callCli(prompt: string, userId?: string): Promise<GeneratedTitle> {
     const agentEnv = await getAgentEnvironment(userId);
+    const command = await resolveProviderCliCommand(PROVIDER_ID, DEFAULT_COMMAND, agentEnv, userId);
 
     return new Promise((resolve, reject) => {
       // Remove Claude-related env vars to avoid "nested session" detection
@@ -274,7 +285,7 @@ export class ClaudeCodeAdapter implements CliProvider {
         )
       ) as NodeJS.ProcessEnv;
 
-      const child = spawnCli('claude', [
+      const child = spawnCli(command, [
         '-p',
         '--output-format', 'json',
         '--no-session-persistence',

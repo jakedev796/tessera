@@ -95,7 +95,7 @@ export default function ToolStatusList() {
       )}
 
       {status && (
-        <div className="grid gap-2 sm:grid-cols-2">
+        <div className="grid gap-2 [grid-template-columns:repeat(auto-fit,minmax(min(100%,22rem),1fr))]">
           {status.availableEnvironments.map((environment) => {
             const environmentState = status.environments[environment];
             if (!environmentState) return null;
@@ -117,20 +117,30 @@ export default function ToolStatusList() {
                     </span>
                   )}
                 </div>
-                <div className="mt-3 space-y-2">
+                <div className="mt-3 space-y-2.5">
                   {TOOL_ORDER.map((tool) => {
                     const toolState = environmentState[tool];
                     return (
-                      <div key={tool} className="flex items-center justify-between gap-3 text-sm">
-                        <span className="text-(--text-primary)">{toolLabels[tool]}</span>
-                        <span className="flex min-w-0 items-center gap-2 text-(--text-muted)">
+                      <div
+                        key={tool}
+                        className="grid grid-cols-[minmax(4.75rem,auto)_minmax(0,1fr)] items-center gap-x-3 gap-y-1 text-sm"
+                      >
+                        <span className="whitespace-nowrap text-(--text-primary)">
+                          {toolLabels[tool]}
+                        </span>
+                        <span className="grid min-w-0 grid-cols-[auto_auto_minmax(0,1fr)] items-center gap-x-2 text-(--text-muted)">
                           <span
                             aria-hidden
                             className={`h-2 w-2 shrink-0 rounded-full ${STATUS_DOT_CLASS[toolState.status]}`}
                           />
-                          <span className="truncate">{statusLabels[toolState.status]}</span>
+                          <span className="whitespace-nowrap">{statusLabels[toolState.status]}</span>
                           {toolState.version && (
-                            <span className="truncate opacity-70">{toolState.version}</span>
+                            <span
+                              className="min-w-0 truncate opacity-70"
+                              title={toolState.version}
+                            >
+                              {toolState.version}
+                            </span>
                           )}
                         </span>
                       </div>

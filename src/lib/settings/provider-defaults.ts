@@ -17,6 +17,7 @@ import {
   splitOpenCodeModelId,
 } from '@/lib/cli/providers/opencode/session-config';
 import type { UserSettings, ProviderSessionDefaults } from './types';
+import { normalizeCliCommandOverrides } from './cli-command-overrides';
 import {
   DEFAULT_PROFILE_AVATAR_DATA_URL,
   DEFAULT_PROFILE_DISPLAY_NAME,
@@ -480,6 +481,7 @@ export function normalizeUserSettings(raw: Partial<UserSettings> | null | undefi
     geminiApiKey: '',
     favoriteSkills: [],
     agentEnvironment: 'native',
+    cliCommandOverrides: {},
     windowsCloseBehavior: 'ask',
     setup: {
       dismissedAt: null,
@@ -558,6 +560,7 @@ export function normalizeUserSettings(raw: Partial<UserSettings> | null | undefi
     ...raw,
     defaultModel: normalizedClaudeModel,
     fontSize: normalizeFontScale(raw?.fontSize),
+    cliCommandOverrides: normalizeCliCommandOverrides(raw?.cliCommandOverrides),
     archivedWorktreeRetentionDays: retentionDays ?? defaults.archivedWorktreeRetentionDays,
     windowsCloseBehavior: normalizeWindowsCloseBehavior(raw?.windowsCloseBehavior),
     profile: normalizeProfileSettings(raw?.profile, defaults.profile),

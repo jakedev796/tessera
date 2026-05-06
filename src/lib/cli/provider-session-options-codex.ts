@@ -3,6 +3,7 @@ import {
   CODEX_ACCESS_OPTIONS,
   SHARED_MODE_OPTIONS,
 } from './provider-session-option-definitions';
+import { resolveProviderCliCommand } from './provider-command';
 import { getAgentEnvironment, spawnCli } from './spawn-cli';
 import type { AgentEnvironment } from '../settings/types';
 import type {
@@ -90,9 +91,10 @@ async function probeCodexModels(
   agentEnvironment?: AgentEnvironment,
 ): Promise<CodexModelResponse> {
   const resolvedAgentEnvironment = agentEnvironment ?? await getAgentEnvironment(userId);
+  const command = await resolveProviderCliCommand('codex', 'codex', resolvedAgentEnvironment, userId);
 
   return new Promise((resolve, reject) => {
-    const proc = spawnCli('codex', ['app-server'], {
+    const proc = spawnCli(command, ['app-server'], {
       stdio: ['pipe', 'pipe', 'pipe'],
       env: process.env as NodeJS.ProcessEnv,
     }, resolvedAgentEnvironment);

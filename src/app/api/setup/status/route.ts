@@ -12,7 +12,7 @@ export async function GET(request: NextRequest) {
     }
 
     const settings = await SettingsManager.load(auth.userId);
-    const status = await buildSetupStatus(settings);
+    const status = await buildSetupStatus(settings, { userId: auth.userId });
 
     return NextResponse.json(status);
   } catch (error) {

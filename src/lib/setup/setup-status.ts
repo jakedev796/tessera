@@ -64,6 +64,7 @@ export interface SetupStatusResponse {
 interface BuildSetupStatusOptions {
   exec?: typeof execCli;
   checkCliStatuses?: typeof checkAllCliStatuses;
+  userId?: string;
 }
 
 export const SETUP_INSTALL_LINKS = {
@@ -102,7 +103,7 @@ export async function buildSetupStatus(
   );
 
   const [cliStatuses, probedTools] = await Promise.all([
-    checkStatuses(),
+    checkStatuses({ userId: options.userId }),
     Promise.all(
       availableEnvironments.map(async (environment) => ({
         environment,

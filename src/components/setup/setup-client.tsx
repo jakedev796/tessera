@@ -15,6 +15,7 @@ import {
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { ElectronTitlebar } from '@/components/layout/electron-titlebar';
+import CliCommandOverrideSettings from '@/components/settings/cli-command-override-settings';
 import { useAuthStore } from '@/stores/auth-store';
 import { useSettingsStore } from '@/stores/settings-store';
 import { useI18n } from '@/lib/i18n';
@@ -77,6 +78,7 @@ export function SetupClient({ initialNeedsAccountSetup = null }: SetupClientProp
   const [accountPassword, setAccountPassword] = useState('');
   const [accountError, setAccountError] = useState<string | null>(null);
   const [isCreatingAccount, setIsCreatingAccount] = useState(false);
+  const [switchingEnvironment, setSwitchingEnvironment] = useState<AgentEnvironment | null>(null);
 
   const refreshStatus = useCallback(async () => {
     setIsLoading(true);
@@ -162,6 +164,13 @@ export function SetupClient({ initialNeedsAccountSetup = null }: SetupClientProp
       : t('setup.usingWindowsTools');
   }, [status, t]);
 
+  const displayedEnvironmentCopy = useMemo(() => {
+    if (!switchingEnvironment) return environmentCopy;
+    return switchingEnvironment === 'wsl'
+      ? t('setup.switchingToWslTools')
+      : t('setup.switchingToWindowsTools');
+  }, [environmentCopy, switchingEnvironment, t]);
+
   const handleProceed = useCallback(async () => {
     const now = new Date().toISOString();
     await updateSettings({
@@ -210,10 +219,24 @@ export function SetupClient({ initialNeedsAccountSetup = null }: SetupClientProp
 
   const switchEnvironment = useCallback(
     async (agentEnvironment: AgentEnvironment) => {
-      await updateSettings({ agentEnvironment });
-      await refreshStatus();
+      if (switchingEnvironment || agentEnvironment === status?.activeEnvironment) {
+        return;
+      }
+
+      setSwitchingEnvironment(agentEnvironment);
+      setIsLoading(true);
+      setError(null);
+      try {
+        await updateSettings({ agentEnvironment });
+        await refreshStatus();
+      } catch (nextError) {
+        setError(nextError instanceof Error ? nextError.message : 'Could not change setup environment.');
+        setIsLoading(false);
+      } finally {
+        setSwitchingEnvironment(null);
+      }
     },
-    [refreshStatus, updateSettings],
+    [refreshStatus, status?.activeEnvironment, switchingEnvironment, updateSettings],
   );
 
   const handleTelemetryChange = useCallback(
@@ -281,11 +304,15 @@ export function SetupClient({ initialNeedsAccountSetup = null }: SetupClientProp
               <div className="flex flex-col gap-3 rounded-lg border border-(--divider) bg-(--sidebar-bg) px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
                 <div className="flex items-center gap-2 text-sm text-(--text-secondary)">
                   <Terminal className="h-4 w-4 text-(--text-muted)" />
-                  <span>{environmentCopy}</span>
+                  <span aria-live="polite" data-testid="setup-environment-copy">
+                    {displayedEnvironmentCopy}
+                  </span>
                 </div>
                 {status.isWindowsEcosystem ? (
                   <EnvironmentSwitch
                     activeEnvironment={status.activeEnvironment}
+                    disabled={isLoading}
+                    switchingEnvironment={switchingEnvironment}
                     onSwitch={switchEnvironment}
                   />
                 ) : null}
@@ -322,6 +349,13 @@ export function SetupClient({ initialNeedsAccountSetup = null }: SetupClientProp
                   {t('setup.limitedMode')}
                 </p>
               ) : null}
+
+              <div className="rounded-lg border border-(--divider) bg-(--sidebar-bg) px-4 py-3">
+                <CliCommandOverrideSettings
+                  environments={status.availableEnvironments}
+                  onSaved={refreshStatus}
+                />
+              </div>
 
               <SetupTelemetryConsent
                 enabled={settings.telemetry.enabled && !telemetryDisabledByEnv}
@@ -421,23 +455,53 @@ function SetupTelemetryConsent({
 
 function EnvironmentSwitch({
   activeEnvironment,
+  disabled,
+  switchingEnvironment,
   onSwitch,
 }: {
   activeEnvironment: AgentEnvironment;
+  disabled: boolean;
+  switchingEnvironment: AgentEnvironment | null;
   onSwitch: (environment: AgentEnvironment) => void;
 }) {
   const { t } = useI18n();
-  const target = activeEnvironment === 'native' ? 'wsl' : 'native';
+  const target = switchingEnvironment ?? (activeEnvironment === 'native' ? 'wsl' : 'native');
+  const isSwitching = switchingEnvironment !== null;
+  const label = getEnvironmentSwitchLabel(target, isSwitching, t);
+
   return (
     <Button
       type="button"
       variant="outline"
       size="sm"
+      disabled={disabled}
+      aria-busy={isSwitching}
       onClick={() => onSwitch(target)}
+      data-testid="setup-environment-switch"
+      className="min-w-[10.5rem] justify-center"
     >
-      {target === 'native' ? t('setup.useWindowsTools') : t('setup.useWslTools')}
+      {isSwitching ? <LoaderCircle className="h-4 w-4 animate-spin" /> : null}
+      {label}
     </Button>
   );
+}
+
+function getEnvironmentSwitchLabel(
+  target: AgentEnvironment,
+  isSwitching: boolean,
+  t: ReturnType<typeof useI18n>['t'],
+): string {
+  if (isSwitching) {
+    if (target === 'native') {
+      return t('setup.switchingToWindowsTools');
+    }
+    return t('setup.switchingToWslTools');
+  }
+
+  if (target === 'native') {
+    return t('setup.useWindowsTools');
+  }
+  return t('setup.useWslTools');
 }
 
 function AccountSetupForm({

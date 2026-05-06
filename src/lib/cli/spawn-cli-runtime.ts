@@ -5,18 +5,64 @@ import { getRuntimePlatform } from '../system/runtime-platform';
 import type { AgentEnvironment } from '../settings/types';
 import type { SpawnCliCache } from './spawn-cli-cache';
 
+type LoginShellEnvironment = Record<string, string>;
+
 const PATH_MARKER_START = '__TESSERA_PATH_START__';
 const PATH_MARKER_END = '__TESSERA_PATH_END__';
+const WSL_FALLBACK_LOGIN_SHELL = 'bash';
+const WSL_LOGIN_SHELL_PROBE_SCRIPT = [
+  'user="$(id -un 2>/dev/null || printf %s "${USER:-}")"',
+  'shell=""',
+  'if command -v getent >/dev/null 2>&1 && [ -n "$user" ]; then shell="$(getent passwd "$user" 2>/dev/null | cut -d: -f7)"; fi',
+  'if [ -z "$shell" ] && [ -n "$user" ] && [ -r /etc/passwd ]; then shell="$(awk -F: -v user="$user" \'$1 == user { print $7; exit }\' /etc/passwd)"; fi',
+  `case "$shell" in /*) printf "%s" "$shell" ;; *) printf "${WSL_FALLBACK_LOGIN_SHELL}" ;; esac`,
+].join('; ');
+const MAC_LOGIN_ENV_EXACT_KEYS = new Set([
+  'PATH',
+  'HOME',
+  'USER',
+  'LOGNAME',
+  'SHELL',
+  'NODE_EXTRA_CA_CERTS',
+  'SSL_CERT_FILE',
+  'SSL_CERT_DIR',
+  'HTTP_PROXY',
+  'HTTPS_PROXY',
+  'ALL_PROXY',
+  'NO_PROXY',
+  'http_proxy',
+  'https_proxy',
+  'all_proxy',
+  'no_proxy',
+]);
+const MAC_LOGIN_ENV_PREFIXES = [
+  'ANTHROPIC_',
+  'CLAUDE_',
+  'CODEX_',
+  'OPENAI_',
+  'OPENCODE_',
+];
+const MAC_SUPPLEMENTAL_CLI_PATHS = [
+  '.bun/bin',
+  '.cargo/bin',
+  'go/bin',
+  '.deno/bin',
+  '.local/bin',
+];
 
 export function resolveDefaultAgentEnvironment(): AgentEnvironment {
   return 'native';
 }
 
 export function invalidateSpawnCliRuntimeCache(cache: SpawnCliCache): void {
+  cache.loginShell = null;
+  cache.didResolveLoginShell = false;
+  cache.loginShellEnvironment = null;
+  cache.didResolveLoginShellEnvironment = false;
   cache.loginShellPath = null;
   cache.didResolveLoginShellPath = false;
-  cache.wslBinaryPaths.clear();
-  cache.windowsNativeBinaryPaths.clear();
+  cache.wslLoginShell = null;
+  cache.didResolveWslLoginShell = false;
 }
 
 export function buildSpawnEnvironment(
@@ -33,7 +79,28 @@ export function buildSpawnEnvironment(
     return env;
   }
 
-  const loginShellPath = resolveLoginShellPath(cache);
+  const shell = resolveLoginShell(cache, env);
+
+  if (getRuntimePlatform() === 'darwin') {
+    const loginShellEnv = resolveMacLoginShellEnvironment(cache, shell, env);
+    if (loginShellEnv) {
+      mergeWhitelistedMacLoginEnvironment(env, loginShellEnv);
+    }
+
+    const loginShellPath = resolveLoginShellPath(cache, shell, env);
+    if (loginShellPath) {
+      mergeIntoEnvironmentPath(env, loginShellPath);
+    }
+
+    const supplementalPath = resolveMacSupplementalCliPath(env);
+    if (supplementalPath) {
+      appendIntoEnvironmentPath(env, supplementalPath);
+    }
+
+    return env;
+  }
+
+  const loginShellPath = resolveLoginShellPath(cache, shell, env);
 
   if (!loginShellPath) {
     return env;
@@ -58,11 +125,11 @@ export function spawnCliProcess(
   }
 
   if (agentEnv === 'native' && getRuntimePlatform() === 'win32') {
-    return spawnWindowsNativeCli(command, args, spawnOptions, cache, env);
+    return spawnWindowsNativeCli(command, args, spawnOptions);
   }
 
   if (agentEnv === 'native' && isRunningInWsl()) {
-    return spawnWindowsNativeCli(command, args, spawnOptions, cache, env);
+    return spawnWindowsNativeCli(command, args, spawnOptions);
   }
 
   return spawn(command, args, spawnOptions);
@@ -100,19 +167,37 @@ function isRunningInWsl(): boolean {
   }
 }
 
-function getLoginShell(): string | null {
-  const configuredShell = process.env.SHELL;
-  if (configuredShell) {
-    return configuredShell;
+function resolveLoginShell(cache: SpawnCliCache, env: NodeJS.ProcessEnv): string | null {
+  if (cache.didResolveLoginShell) {
+    return cache.loginShell;
   }
 
+  cache.didResolveLoginShell = true;
+
   const platform = getRuntimePlatform();
+
   if (platform === 'darwin') {
-    return '/bin/zsh';
+    const macUserShell = resolveMacUserShell(env);
+    if (macUserShell) {
+      cache.loginShell = macUserShell;
+      return cache.loginShell;
+    }
+  }
+
+  const configuredShell = env.SHELL || process.env.SHELL;
+  if (configuredShell) {
+    cache.loginShell = configuredShell;
+    return cache.loginShell;
+  }
+
+  if (platform === 'darwin') {
+    cache.loginShell = '/bin/zsh';
+    return cache.loginShell;
   }
 
   if (platform === 'linux') {
-    return '/bin/bash';
+    cache.loginShell = '/bin/bash';
+    return cache.loginShell;
   }
 
   return null;
@@ -141,15 +226,59 @@ function mergeIntoEnvironmentPath(env: NodeJS.ProcessEnv, primaryPath: string): 
   env[pathKey] = mergePathValues(primaryPath, env[pathKey]);
 }
 
+function appendIntoEnvironmentPath(env: NodeJS.ProcessEnv, secondaryPath: string): void {
+  const pathKey = getPathEnvironmentKey(env);
+  env[pathKey] = mergePathValues(env[pathKey] ?? '', secondaryPath);
+}
+
 function resolveWindowsCliPath(env: NodeJS.ProcessEnv): string | null {
   const appData = env.APPDATA?.trim();
+  const localAppData = env.LOCALAPPDATA?.trim();
   const userProfile = env.USERPROFILE?.trim();
+  const programFiles = env.ProgramFiles?.trim();
+  const programFilesX86 = env['ProgramFiles(x86)']?.trim();
+  const chocolateyInstall = env.ChocolateyInstall?.trim();
+  const scoop = env.SCOOP?.trim();
   const candidates = [
     appData ? `${appData}\\npm` : null,
     userProfile ? `${userProfile}\\AppData\\Roaming\\npm` : null,
+    programFiles ? `${programFiles}\\nodejs` : null,
+    programFilesX86 ? `${programFilesX86}\\nodejs` : null,
+    env.NVM_HOME?.trim() || (appData ? `${appData}\\nvm` : null),
+    env.NVM_SYMLINK?.trim() || (programFiles ? `${programFiles}\\nodejs` : null),
+    env.FNM_MULTISHELL_PATH?.trim() || null,
+    localAppData ? `${localAppData}\\fnm_multishells` : null,
+    userProfile ? `${userProfile}\\.volta\\bin` : null,
+    scoop ? `${scoop}\\shims` : userProfile ? `${userProfile}\\scoop\\shims` : null,
+    localAppData ? `${localAppData}\\pnpm` : null,
+    localAppData ? `${localAppData}\\OfficeCli` : null,
+    chocolateyInstall ? `${chocolateyInstall}\\bin` : 'C:\\ProgramData\\chocolatey\\bin',
+    programFiles ? `${programFiles}\\Git\\cmd` : null,
+    programFiles ? `${programFiles}\\Git\\bin` : null,
+    programFiles ? `${programFiles}\\Git\\usr\\bin` : null,
+    programFilesX86 ? `${programFilesX86}\\Git\\cmd` : null,
+    programFilesX86 ? `${programFilesX86}\\Git\\bin` : null,
+    programFilesX86 ? `${programFilesX86}\\Git\\usr\\bin` : null,
+    'C:\\cygwin64\\bin',
+    'C:\\cygwin\\bin',
+    userProfile ? `${userProfile}\\.bun\\bin` : null,
+    userProfile ? `${userProfile}\\.cargo\\bin` : null,
+    userProfile ? `${userProfile}\\go\\bin` : null,
+    userProfile ? `${userProfile}\\.deno\\bin` : null,
+    userProfile ? `${userProfile}\\.local\\bin` : null,
   ].filter((value): value is string => Boolean(value));
 
-  return candidates.length > 0 ? [...new Set(candidates)].join(getEnvironmentPathDelimiter()) : null;
+  const existingCandidates = candidates.filter((candidate) => {
+    try {
+      return existsSync(candidate);
+    } catch {
+      return false;
+    }
+  });
+
+  return existingCandidates.length > 0
+    ? [...new Set(existingCandidates)].join(getEnvironmentPathDelimiter())
+    : null;
 }
 
 function parseMarkedPath(stdout: string): string | null {
@@ -167,7 +296,11 @@ function parseMarkedPath(stdout: string): string | null {
   return resolvedPath || null;
 }
 
-function resolveLoginShellPath(cache: SpawnCliCache): string | null {
+function resolveLoginShellPath(
+  cache: SpawnCliCache,
+  shell: string | null,
+  env: NodeJS.ProcessEnv,
+): string | null {
   if (cache.didResolveLoginShellPath) {
     return cache.loginShellPath;
   }
@@ -178,7 +311,6 @@ function resolveLoginShellPath(cache: SpawnCliCache): string | null {
     return null;
   }
 
-  const shell = getLoginShell();
   if (!shell) {
     return null;
   }
@@ -189,7 +321,7 @@ function resolveLoginShellPath(cache: SpawnCliCache): string | null {
       ['-ilc', `printf '${PATH_MARKER_START}%s${PATH_MARKER_END}' "$PATH"`],
       {
         encoding: 'utf8',
-        env: process.env,
+        env,
         timeout: 5000,
         windowsHide: true,
       },
@@ -204,6 +336,134 @@ function resolveLoginShellPath(cache: SpawnCliCache): string | null {
   } catch {
     return null;
   }
+}
+
+function resolveMacLoginShellEnvironment(
+  cache: SpawnCliCache,
+  shell: string | null,
+  env: NodeJS.ProcessEnv,
+): LoginShellEnvironment | null {
+  if (cache.didResolveLoginShellEnvironment) {
+    return cache.loginShellEnvironment;
+  }
+
+  cache.didResolveLoginShellEnvironment = true;
+
+  if (getRuntimePlatform() !== 'darwin' || !shell) {
+    return null;
+  }
+
+  try {
+    const probe = spawnSync(shell, ['-l', '-c', 'env'], {
+      encoding: 'utf8',
+      env,
+      timeout: 5000,
+      windowsHide: true,
+    });
+
+    if (probe.status !== 0 || typeof probe.stdout !== 'string') {
+      return null;
+    }
+
+    cache.loginShellEnvironment = parseEnvOutput(probe.stdout);
+    return cache.loginShellEnvironment;
+  } catch {
+    return null;
+  }
+}
+
+function resolveMacUserShell(env: NodeJS.ProcessEnv): string | null {
+  const username = (env.USER || env.LOGNAME || process.env.USER || process.env.LOGNAME)?.trim();
+  if (!username) {
+    return null;
+  }
+
+  try {
+    const probe = spawnSync('dscl', ['.', '-read', `/Users/${username}`, 'UserShell'], {
+      encoding: 'utf8',
+      env,
+      timeout: 2000,
+      windowsHide: true,
+    });
+
+    if (probe.status !== 0 || typeof probe.stdout !== 'string') {
+      return null;
+    }
+
+    const match = probe.stdout.match(/(?:^|\n)UserShell:\s*(\S+)/);
+    const shell = match?.[1]?.trim();
+    return shell && shell.startsWith('/') ? shell : null;
+  } catch {
+    return null;
+  }
+}
+
+function parseEnvOutput(stdout: string): LoginShellEnvironment | null {
+  const parsed: LoginShellEnvironment = {};
+
+  for (const line of stdout.split(/\r?\n/)) {
+    const separatorIndex = line.indexOf('=');
+    if (separatorIndex <= 0) {
+      continue;
+    }
+
+    const key = line.slice(0, separatorIndex);
+    if (!/^[A-Za-z_][A-Za-z0-9_]*$/.test(key)) {
+      continue;
+    }
+
+    parsed[key] = line.slice(separatorIndex + 1);
+  }
+
+  return Object.keys(parsed).length > 0 ? parsed : null;
+}
+
+function mergeWhitelistedMacLoginEnvironment(
+  target: NodeJS.ProcessEnv,
+  source: LoginShellEnvironment,
+): void {
+  for (const [key, value] of Object.entries(source)) {
+    if (typeof value !== 'string' || value.length === 0) {
+      continue;
+    }
+
+    if (key === 'PATH') {
+      mergeIntoEnvironmentPath(target, value);
+      continue;
+    }
+
+    if (isAllowedMacLoginEnvironmentKey(key)) {
+      target[key] = value;
+    }
+  }
+}
+
+function isAllowedMacLoginEnvironmentKey(key: string): boolean {
+  if (MAC_LOGIN_ENV_EXACT_KEYS.has(key)) {
+    return true;
+  }
+
+  const upperKey = key.toUpperCase();
+  return MAC_LOGIN_ENV_PREFIXES.some((prefix) => upperKey.startsWith(prefix));
+}
+
+function resolveMacSupplementalCliPath(env: NodeJS.ProcessEnv): string | null {
+  const home = (env.HOME || process.env.HOME)?.trim();
+  if (!home) {
+    return null;
+  }
+
+  const candidates = MAC_SUPPLEMENTAL_CLI_PATHS
+    .map((relativePath) => `${home}/${relativePath}`)
+    .filter((candidate) => {
+      try {
+        return existsSync(candidate);
+      } catch {
+        return false;
+      }
+    });
+
+  return candidates.length > 0 ? [...new Set(candidates)].join(getEnvironmentPathDelimiter()) : null;
 }
 
 function buildPlatformSpawnOptions(
@@ -229,29 +489,37 @@ function spawnWslCli(
   env: NodeJS.ProcessEnv,
 ): ChildProcess {
   const { cwd, ...spawnOptions } = options;
-  const resolvedCommand = resolveWslBinaryPath(cache, command, env) || command;
+  const shell = resolveWslLoginShell(cache, env);
   const wslCwd = typeof cwd === 'string' && cwd.length > 0
     ? normalizeCwdForCliEnvironment(cwd, 'wsl')
     : null;
-  const script = buildBashLoginExecScript(resolvedCommand, args, wslCwd);
+  const script = buildLoginShellExecScript(command, args, wslCwd);
 
-  return spawn('wsl', ['bash', '-lic', script], spawnOptions);
+  return spawn('wsl', [shell, '-i', '-l', '-c', script], spawnOptions);
 }
 
 function spawnWindowsNativeCli(
   command: string,
   args: string[],
   options: SpawnOptions,
-  cache: SpawnCliCache,
-  env: NodeJS.ProcessEnv,
 ): ChildProcess {
-  const resolvedCommand = resolveWindowsNativeBinaryPath(cache, command, env);
+  if (isExplicitExecutablePath(command)) {
+    return spawnResolvedWindowsNativeCli(command, args, options);
+  }
 
-  if (resolvedCommand) {
-    return spawnResolvedWindowsNativeCli(resolvedCommand, args, options);
+  if (getRuntimePlatform() === 'win32') {
+    return spawnWindowsNativeCliViaCmd(command, args, options);
   }
 
   return spawnWindowsNativeCliViaPowerShell(command, args, options);
+}
+
+function spawnWindowsNativeCliViaCmd(
+  command: string,
+  args: string[],
+  options: SpawnOptions,
+): ChildProcess {
+  return spawn('cmd.exe', ['/d', '/c', command, ...args], options);
 }
 
 function spawnResolvedWindowsNativeCli(
@@ -375,95 +643,16 @@ function toWslPath(cwd: string): string | null {
   return null;
 }
 
-function resolveWindowsNativeBinaryPath(
-  cache: SpawnCliCache,
-  command: string,
-  env: NodeJS.ProcessEnv,
-): string | null {
-  const cachedBinaryPath = cache.windowsNativeBinaryPaths.get(command);
-  if (cachedBinaryPath) {
-    return cachedBinaryPath;
-  }
-
-  const windowsPath = resolveWindowsNativeBinaryPathFromWhere(command, env);
-  if (!windowsPath) {
-    return null;
-  }
-
-  cache.windowsNativeBinaryPaths.set(command, windowsPath);
-  return windowsPath;
-}
-
-function resolveWindowsNativeBinaryPathFromWhere(
-  command: string,
-  env: NodeJS.ProcessEnv,
-): string | null {
-  try {
-    const probe = spawnSync('cmd.exe', ['/d', '/s', '/c', `where ${quoteCmdArg(command)}`], {
-      encoding: 'utf8',
-      env,
-      timeout: 5000,
-      windowsHide: true,
-    });
-
-    if (probe.status !== 0 || typeof probe.stdout !== 'string') {
-      return null;
-    }
-
-    const candidates = probe.stdout
-      .split(/\r?\n/)
-      .map((line) => line.trim())
-      .filter(isSupportedWindowsNativeBinaryPath);
-
-    return pickPreferredWindowsNativeBinaryPath(candidates);
-  } catch {
-    return null;
-  }
-}
-
-function isSupportedWindowsNativeBinaryPath(value: string): boolean {
-  return ['.exe', '.com', '.cmd', '.bat', '.ps1'].includes(getWindowsPathExtension(value));
-}
-
-function pickPreferredWindowsNativeBinaryPath(candidates: string[]): string | null {
-  if (candidates.length === 0) {
-    return null;
-  }
-
-  const priority = new Map([
-    ['.exe', 0],
-    ['.com', 1],
-    ['.cmd', 2],
-    ['.bat', 3],
-    ['.ps1', 4],
-  ]);
-
-  return candidates
-    .slice()
-    .sort((a, b) => (
-      (priority.get(getWindowsPathExtension(a)) ?? Number.MAX_SAFE_INTEGER)
-      - (priority.get(getWindowsPathExtension(b)) ?? Number.MAX_SAFE_INTEGER)
-    ))[0] ?? null;
-}
-
 function getWindowsPathExtension(value: string): string {
   const match = value.match(/\.([^.\\/]+)$/);
   return match ? `.${match[1].toLowerCase()}` : '';
-}
-
-function quoteCmdArg(value: string): string {
-  if (/^[A-Za-z0-9_.:/\\-]+$/.test(value)) {
-    return value;
-  }
-
-  return `"${value.replace(/"/g, '""')}"`;
 }
 
 function quoteBashArg(value: string): string {
   return `'${value.replace(/'/g, `'\\''`)}'`;
 }
 
-function buildBashLoginExecScript(
+function buildLoginShellExecScript(
   command: string,
   args: string[],
   cwd: string | null,
@@ -492,20 +681,17 @@ function windowsExecutablePathToWslPath(windowsPath: string): string | null {
   return `/mnt/${drive}/${rest}`;
 }
 
-function resolveWslBinaryPath(
-  cache: SpawnCliCache,
-  command: string,
-  env: NodeJS.ProcessEnv,
-): string | null {
-  const cachedBinaryPath = cache.wslBinaryPaths.get(command);
-  if (cachedBinaryPath) {
-    return cachedBinaryPath;
+function resolveWslLoginShell(cache: SpawnCliCache, env: NodeJS.ProcessEnv): string {
+  if (cache.didResolveWslLoginShell) {
+    return cache.wslLoginShell ?? WSL_FALLBACK_LOGIN_SHELL;
   }
+
+  cache.didResolveWslLoginShell = true;
 
   try {
     const probe = spawnSync(
       'wsl',
-      ['bash', '-lic', `command -v ${quoteBashArg(command)}`],
+      ['sh', '-lc', WSL_LOGIN_SHELL_PROBE_SCRIPT],
       {
         encoding: 'utf8',
         env,
@@ -515,22 +701,22 @@ function resolveWslBinaryPath(
     );
 
     if (probe.status !== 0 || typeof probe.stdout !== 'string') {
-      return null;
+      cache.wslLoginShell = WSL_FALLBACK_LOGIN_SHELL;
+      return cache.wslLoginShell;
     }
 
-    const resolvedPath = probe.stdout
-      .split(/\r?\n/)
-      .map((line) => line.trim())
-      .filter((line) => line.length > 0)
-      .at(-1);
-
-    if (!resolvedPath) {
-      return null;
-    }
-
-    cache.wslBinaryPaths.set(command, resolvedPath);
-    return resolvedPath;
+    const shell = probe.stdout.trim();
+    cache.wslLoginShell = shell.startsWith('/') ? shell : WSL_FALLBACK_LOGIN_SHELL;
+    return cache.wslLoginShell;
   } catch {
-    return null;
+    cache.wslLoginShell = WSL_FALLBACK_LOGIN_SHELL;
+    return cache.wslLoginShell;
   }
+}
+
+function isExplicitExecutablePath(value: string): boolean {
+  return value.startsWith('/')
+    || /^[A-Za-z]:[\\/]/.test(value)
+    || /^\\\\[^\\]+\\[^\\]+/.test(value)
+    || /^\/\/[^/]+\/[^/]+/.test(value);
 }

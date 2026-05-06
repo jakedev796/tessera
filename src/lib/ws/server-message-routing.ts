@@ -284,7 +284,7 @@ async function listProvidersForWebSocketUser(
 ): Promise<void> {
   try {
     const agentEnvironment = await getAgentEnvironment(userId);
-    const providers = await checkProviderStatusesForEnvironment(agentEnvironment);
+    const providers = await checkProviderStatusesForEnvironment(userId, agentEnvironment);
     sendToUser(userId, {
       type: 'providers_list',
       requestId,
@@ -316,7 +316,7 @@ async function refreshProvidersForWebSocketUser(
 ): Promise<void> {
   try {
     const agentEnvironment = await getAgentEnvironment(userId);
-    const providers = await checkProviderStatusesForEnvironment(agentEnvironment, { force: true });
+    const providers = await checkProviderStatusesForEnvironment(userId, agentEnvironment, { force: true });
     sendToUser(userId, {
       type: 'providers_list',
       requestId,
@@ -347,7 +347,7 @@ async function checkCliStatusForWebSocketUser(
   sendToUser: WsSendToUser,
 ): Promise<void> {
   try {
-    const results = await getCliStatusSnapshot({ force: true });
+    const results = await getCliStatusSnapshot({ force: true, userId });
     sendToUser(userId, {
       type: 'cli_status_result',
       requestId,
@@ -369,12 +369,13 @@ async function checkCliStatusForWebSocketUser(
 }
 
 async function checkProviderStatusesForEnvironment(
+  userId: string,
   agentEnvironment: 'native' | 'wsl',
   options: { force?: boolean } = {},
 ): Promise<ProviderMeta[]> {
   const results = options.force
-    ? await getCliStatusSnapshot({ force: true })
-    : await getCliStatusSnapshot();
+    ? await getCliStatusSnapshot({ force: true, userId })
+    : await getCliStatusSnapshot({ userId });
   const byId = new Map(
     results
       .filter((r) => r.environment === agentEnvironment)

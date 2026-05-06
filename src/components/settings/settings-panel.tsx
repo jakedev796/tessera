@@ -13,6 +13,7 @@ import KeyboardSettings from './keyboard-settings';
 import WindowBehaviorSettings from './window-behavior-settings';
 import AppearanceSettings from './appearance-settings';
 import AgentEnvironmentSettings from './agent-environment-settings';
+import CliCommandOverrideSettings from './cli-command-override-settings';
 import WorktreeSettings from './worktree-settings';
 import CliStatusList from './cli-status-list';
 import ToolStatusList from './tool-status-list';
@@ -140,6 +141,9 @@ export default function SettingsPanel() {
                 <AgentEnvironmentSettings isWindowsServer={isWindowsServer} />
               </SettingsCard>
             )}
+            <SettingsCard testId="settings-section-development-cli-overrides">
+              <CliCommandOverrideSettings />
+            </SettingsCard>
             <SettingsCard testId="settings-section-development-worktrees">
               <WorktreeSettings />
             </SettingsCard>

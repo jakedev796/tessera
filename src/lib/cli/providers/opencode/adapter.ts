@@ -13,6 +13,7 @@ import type { ProviderRuntimeControls } from '@/lib/session/session-control-type
 import { isBinaryAvailable } from '../registry';
 import { execCli, parseVersion, probeBinaryAvailable } from '../../cli-exec';
 import { getAgentEnvironment, normalizeCwdForCliEnvironment, spawnCli } from '../../spawn-cli';
+import { resolveProviderCliCommand } from '../../provider-command';
 import { updateProviderStateWithRetry } from '../../process-manager-side-effects';
 import { getRuntimePlatform } from '@/lib/system/runtime-platform';
 import logger from '@/lib/logger';
@@ -27,6 +28,8 @@ import {
 const CLI_TIMEOUT_MS = 120_000;
 const STATUS_CHECK_TIMEOUT_MS = 5_000;
 const TITLE_TIMEOUT_MS = 120_000;
+const PROVIDER_ID = 'opencode';
+const DEFAULT_COMMAND = 'opencode';
 
 interface JsonRpcRequest {
   jsonrpc: '2.0';
@@ -61,7 +64,7 @@ export class OpenCodeAdapter implements CliProvider {
   private _initialConfigSent = new WeakSet<ChildProcess>();
 
   getProviderId(): string {
-    return 'opencode';
+    return PROVIDER_ID;
   }
 
   getDisplayName(): string {
@@ -76,9 +79,15 @@ export class OpenCodeAdapter implements CliProvider {
   }
 
   async checkStatus(options: CheckStatusOptions): Promise<CliStatusResult> {
+    const command = await resolveProviderCliCommand(
+      PROVIDER_ID,
+      DEFAULT_COMMAND,
+      options.environment,
+      options.userId,
+    );
     const [versionResult, modelsResult] = await Promise.all([
-      execCli('opencode', ['--version'], options.environment, STATUS_CHECK_TIMEOUT_MS),
-      execCli('opencode', ['models'], options.environment, STATUS_CHECK_TIMEOUT_MS),
+      execCli(command, ['--version'], options.environment, STATUS_CHECK_TIMEOUT_MS),
+      execCli(command, ['models'], options.environment, STATUS_CHECK_TIMEOUT_MS),
     ]);
 
     if (!versionResult.ok) {
@@ -98,6 +107,7 @@ export class OpenCodeAdapter implements CliProvider {
 
   async spawn(workDir: string, options: SpawnOptions): Promise<SpawnResult> {
     const agentEnv = await getAgentEnvironment(options.userId);
+    const command = await resolveProviderCliCommand(PROVIDER_ID, DEFAULT_COMMAND, agentEnv, options.userId);
     const cliWorkDir = normalizeCwdForCliEnvironment(workDir, agentEnv);
     const args = this.getCliArgs(options);
     const spawnEnv: Record<string, string | undefined> = { ...process.env };
@@ -108,7 +118,7 @@ export class OpenCodeAdapter implements CliProvider {
       delete spawnEnv.OPENCODE_PERMISSION;
     }
 
-    const cliProcess = spawnCli('opencode', args, {
+    const cliProcess = spawnCli(command, args, {
       cwd: cliWorkDir,
       shell: false,
       env: spawnEnv as NodeJS.ProcessEnv,
@@ -503,9 +513,10 @@ export class OpenCodeAdapter implements CliProvider {
     userId?: string,
   ): Promise<GeneratedTitle | null> {
     const agentEnv = await getAgentEnvironment(userId);
+    const command = await resolveProviderCliCommand(PROVIDER_ID, DEFAULT_COMMAND, agentEnv, userId);
 
     return new Promise((resolve, reject) => {
-      const child = spawnCli('opencode', [
+      const child = spawnCli(command, [
         'run',
         '--format',
         'json',

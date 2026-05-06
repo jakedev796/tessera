@@ -31,6 +31,8 @@ export interface CheckStatusOptions {
    * "wsl"    = spawn through wsl.exe on Windows. Ignored on non-Windows.
    */
   environment: 'native' | 'wsl';
+  /** Optional user id for settings-aware CLI command overrides. */
+  userId?: string;
 }
 
 /**

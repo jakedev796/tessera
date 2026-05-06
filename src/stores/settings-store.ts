@@ -204,9 +204,14 @@ export const useSettingsStore = create<SettingsState>()(
           }
         }
 
-        // agentEnvironment flip changes which binaries are reachable — pull a
-        // fresh status list so chip selectors / empty states re-render right away.
-        if (saved && partial.agentEnvironment && partial.agentEnvironment !== prior.agentEnvironment) {
+        // Environment and CLI command overrides change which binaries are reachable.
+        if (
+          saved
+          && (
+            (partial.agentEnvironment && partial.agentEnvironment !== prior.agentEnvironment)
+            || partial.cliCommandOverrides
+          )
+        ) {
           const { useProvidersStore } = await import('@/stores/providers-store');
           useProvidersStore.getState().refresh();
         }

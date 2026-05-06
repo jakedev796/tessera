@@ -109,8 +109,9 @@ export async function execCli(
  * Checks whether a CLI binary is reachable in the requested environment.
  *
  * Routes through execCli so the probe runs in the correct host:
- *   - env=native on Windows/WSL → `where <binary>` via cmd.exe
- *   - env=wsl   on Windows      → `which <binary>` via wsl.exe
+ *   - env=native on Windows     → `where.exe <binary>` via cmd.exe
+ *   - env=native from WSL       → `where.exe <binary>` via PowerShell
+ *   - env=wsl   on Windows      → `which <binary>` via wsl.exe login shell
  *   - otherwise (Linux/macOS)   → `which <binary>` directly
  */
 export async function probeBinaryAvailable(
@@ -120,7 +121,7 @@ export async function probeBinaryAvailable(
   const onWin32 = getRuntimePlatform() === 'win32';
   const onWsl = !onWin32 && isRunningInWsl();
   const targetIsWindows = environment === 'native' && (onWin32 || onWsl);
-  const probe = targetIsWindows ? 'where' : 'which';
+  const probe = targetIsWindows ? 'where.exe' : 'which';
   const result = await execCli(probe, [binary], environment, 5000);
   return result.ok;
 }

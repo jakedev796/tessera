@@ -5,10 +5,14 @@ const SPAWN_CACHE_KEY = Symbol.for('tessera.spawnCliCache');
 export interface SpawnCliCache {
   agentEnvironmentByUserId: Map<string, AgentEnvironment>;
   defaultAgentEnvironment: AgentEnvironment | null;
+  loginShell: string | null;
+  didResolveLoginShell: boolean;
+  loginShellEnvironment: Record<string, string> | null;
+  didResolveLoginShellEnvironment: boolean;
   loginShellPath: string | null;
   didResolveLoginShellPath: boolean;
-  wslBinaryPaths: Map<string, string>;
-  windowsNativeBinaryPaths: Map<string, string>;
+  wslLoginShell: string | null;
+  didResolveWslLoginShell: boolean;
 }
 
 export function getSpawnCliCache(): SpawnCliCache {
@@ -17,9 +21,13 @@ export function getSpawnCliCache(): SpawnCliCache {
   )[SPAWN_CACHE_KEY] ??= {
     agentEnvironmentByUserId: new Map(),
     defaultAgentEnvironment: null,
+    loginShell: null,
+    didResolveLoginShell: false,
+    loginShellEnvironment: null,
+    didResolveLoginShellEnvironment: false,
     loginShellPath: null,
     didResolveLoginShellPath: false,
-    wslBinaryPaths: new Map(),
-    windowsNativeBinaryPaths: new Map(),
+    wslLoginShell: null,
+    didResolveWslLoginShell: false,
   };
 }

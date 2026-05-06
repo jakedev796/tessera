@@ -12,11 +12,13 @@ export interface CliStatusEntry extends CliStatusResult {
 export interface CheckAllOptions {
   /** Override registry for testability. Defaults to the singleton. */
   registry?: CliProviderRegistry;
+  /** User settings owner; enables per-user CLI command overrides. */
+  userId?: string;
 }
 
 const CLI_STATUS_CACHE_TTL_MS = 30_000;
-let cachedStatuses: { results: CliStatusEntry[]; checkedAt: number } | null = null;
-let statusCheckInFlight: Promise<CliStatusEntry[]> | null = null;
+let cachedStatusesByKey = new Map<string, { results: CliStatusEntry[]; checkedAt: number }>();
+let statusCheckInFlightByKey = new Map<string, Promise<CliStatusEntry[]>>();
 
 /**
  * Returns the list of environments to probe on the current host.
@@ -49,7 +51,7 @@ export async function checkAllCliStatuses(
     const provider = registry.getProvider(providerId);
     for (const environment of environments) {
       tasks.push(
-        provider.checkStatus({ environment })
+        provider.checkStatus({ environment, userId: options.userId })
           .then<CliStatusEntry>((result) => ({
             providerId,
             environment,
@@ -82,26 +84,31 @@ export async function getCliStatusSnapshot(
     return checkAllCliStatuses(options);
   }
 
+  const cacheKey = options.userId ?? '__default__';
+  const cachedStatuses = cachedStatusesByKey.get(cacheKey);
   if (!options.force && cachedStatuses && Date.now() - cachedStatuses.checkedAt < CLI_STATUS_CACHE_TTL_MS) {
     return cachedStatuses.results;
   }
 
+  const statusCheckInFlight = statusCheckInFlightByKey.get(cacheKey);
   if (statusCheckInFlight) {
     return statusCheckInFlight;
   }
 
-  statusCheckInFlight = checkAllCliStatuses({ registry: defaultRegistry })
+  const nextStatusCheck = checkAllCliStatuses({ registry: defaultRegistry, userId: options.userId })
     .then((results) => {
-      cachedStatuses = { results, checkedAt: Date.now() };
+      cachedStatusesByKey.set(cacheKey, { results, checkedAt: Date.now() });
       return results;
     })
     .finally(() => {
-      statusCheckInFlight = null;
+      statusCheckInFlightByKey.delete(cacheKey);
     });
 
-  return statusCheckInFlight;
+  statusCheckInFlightByKey.set(cacheKey, nextStatusCheck);
+  return nextStatusCheck;
 }
 
 export function invalidateCliStatusSnapshot(): void {
-  cachedStatuses = null;
+  cachedStatusesByKey = new Map();
+  statusCheckInFlightByKey = new Map();
 }

@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { wsClient } from '@/lib/ws/client';
 import { useI18n } from '@/lib/i18n';
+import { useSettingsStore } from '@/stores/settings-store';
 import type { CliStatusEntry } from '@/lib/cli/connection-checker';
 
 const PROVIDER_DISPLAY_NAMES: Record<string, string> = {
@@ -19,6 +20,9 @@ const STATUS_DOT_CLASS: Record<CliStatusEntry['status'], string> = {
 
 export default function CliStatusList() {
   const { t } = useI18n();
+  const cliCommandOverridesKey = useSettingsStore((state) => (
+    JSON.stringify(state.settings.cliCommandOverrides ?? {})
+  ));
   // null = loading, [] = no providers registered, undefined = disconnected / server error
   const [entries, setEntries] = useState<CliStatusEntry[] | null | undefined>(null);
 
@@ -41,7 +45,7 @@ export default function CliStatusList() {
     return () => {
       isMounted = false;
     };
-  }, []);
+  }, [cliCommandOverridesKey]);
 
   const shouldShowEnvTag = useMemo(() => {
     if (!entries || entries.length === 0) return new Set<string>();

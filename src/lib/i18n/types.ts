@@ -101,6 +101,17 @@ export interface I18nMessages {
         not_installed: string;
       };
     };
+    cliOverrides: {
+      title: string;
+      description: string;
+      commandLabel: string;
+      commandLabelWithEnv: string;
+      placeholderNativePosix: string;
+      placeholderNativeWindows: string;
+      placeholderWsl: string;
+      clear: string;
+      help: string;
+    };
     permissionMode: {
       defaultDesc: string;
       acceptEditsDesc: string;
@@ -248,6 +259,8 @@ export interface I18nMessages {
     installForWindows: string;
     useWindowsTools: string;
     useWslTools: string;
+    switchingToWindowsTools: string;
+    switchingToWslTools: string;
     showAdvanced: string;
     hideAdvanced: string;
     advancedTitle: string;

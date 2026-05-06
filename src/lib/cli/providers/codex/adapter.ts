@@ -45,6 +45,7 @@ import { buildCodexSandboxPolicy, getCodexPermissionMapping } from './session-co
 import { isBinaryAvailable } from '../registry';
 import { getAgentEnvironment, normalizeCwdForCliEnvironment, spawnCli } from '../../spawn-cli';
 import { execCli, parseVersion, probeBinaryAvailable } from '../../cli-exec';
+import { resolveProviderCliCommand } from '../../provider-command';
 import { updateProviderStateWithRetry } from '../../process-manager-side-effects';
 import { getRuntimePlatform } from '@/lib/system/runtime-platform';
 import logger from '@/lib/logger';
@@ -53,6 +54,8 @@ import { getTesseraDataPath } from '@/lib/tessera-data-dir';
 const CLI_TIMEOUT_MS = 120_000;
 const STATUS_CHECK_TIMEOUT_MS = 5_000;
 const TITLE_REASONING_EFFORT = 'low';
+const PROVIDER_ID = 'codex';
+const DEFAULT_COMMAND = 'codex';
 const CODEX_ATTACHMENTS_DIR = getTesseraDataPath('attachments', 'codex');
 
 type CodexInputItem =
@@ -196,7 +199,7 @@ export class CodexAdapter implements CliProvider {
   // ---------------------------------------------------------------------------
 
   getProviderId(): string {
-    return 'codex';
+    return PROVIDER_ID;
   }
 
   getDisplayName(): string {
@@ -220,15 +223,21 @@ export class CodexAdapter implements CliProvider {
    * by serial CLI startup costs on Windows.
    */
   async checkStatus(options: CheckStatusOptions): Promise<CliStatusResult> {
+    const command = await resolveProviderCliCommand(
+      PROVIDER_ID,
+      DEFAULT_COMMAND,
+      options.environment,
+      options.userId,
+    );
     const [versionResult, loginResult] = await Promise.all([
       execCli(
-        'codex',
+        command,
         ['--version'],
         options.environment,
         STATUS_CHECK_TIMEOUT_MS,
       ),
       execCli(
-        'codex',
+        command,
         ['login', 'status'],
         options.environment,
         STATUS_CHECK_TIMEOUT_MS,
@@ -280,9 +289,10 @@ export class CodexAdapter implements CliProvider {
   async spawn(workDir: string, options: SpawnOptions): Promise<SpawnResult> {
     const args = this.getCliArgs(options);
     const agentEnv = await getAgentEnvironment(options.userId);
+    const command = await resolveProviderCliCommand(PROVIDER_ID, DEFAULT_COMMAND, agentEnv, options.userId);
     const cliWorkDir = normalizeCwdForCliEnvironment(workDir, agentEnv);
 
-    const cliProcess = spawnCli('codex', args, {
+    const cliProcess = spawnCli(command, args, {
       cwd: cliWorkDir,
       shell: false,
       env: process.env as NodeJS.ProcessEnv,
@@ -925,10 +935,11 @@ export class CodexAdapter implements CliProvider {
     userId?: string,
   ): Promise<GeneratedTitle | null> {
     const agentEnv = await getAgentEnvironment(userId);
+    const command = await resolveProviderCliCommand(PROVIDER_ID, DEFAULT_COMMAND, agentEnv, userId);
 
     return new Promise((resolve, reject) => {
       const child = spawnCli(
-        'codex',
+        command,
         [
           'exec',
           '--json',
