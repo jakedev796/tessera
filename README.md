@@ -192,8 +192,10 @@ npm install
 Tessera uses a custom Node.js server for the Next.js app, WebSocket transport, database initialization, provider bootstrapping, and background pollers. Run `server.ts` instead of starting Next.js directly:
 
 ```bash
-PORT=3100 npx tsx server.ts
+npm run dev
 ```
+
+The development server uses port `3100` by default. To run on a different port, set `PORT`, for example `PORT=32124 npm run dev`.
 
 Supported environment variables:
 

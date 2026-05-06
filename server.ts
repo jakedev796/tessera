@@ -19,7 +19,7 @@ import logger from './src/lib/logger';
 
 const dev = process.env.NODE_ENV !== 'production';
 const hostname = process.env.TESSERA_HOST || process.env.HOST || '127.0.0.1';
-const port = parseInt(process.env.PORT || '3000', 10);
+const port = parseInt(process.env.PORT || (dev ? '3100' : '3000'), 10);
 const dir = process.env.TESSERA_APP_ROOT || process.cwd();
 
 loadEnvConfig(dir, dev, console, true);
