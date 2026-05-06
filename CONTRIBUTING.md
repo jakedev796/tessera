@@ -13,6 +13,12 @@ Use the bug or feature template. Screenshots, recordings, and clear reproduction
 - Open an issue first for larger features, new provider integrations, workflow changes, or architecture changes.
 - Do not include secrets, private prompts, API keys, tokens, private repository names, or sensitive logs.
 
+## Cross-Platform Support
+
+Tessera supports the npm runtime and desktop builds across Windows, macOS, and Linux. When changing runtime, filesystem, process spawning, shell, path, Electron, or CLI-provider behavior, keep cross-platform behavior in mind.
+
+Test on the platforms you can access, and note what you tested in the PR. If you could not test a relevant platform, mention that too.
+
 ## Source Setup
 
 ```bash
