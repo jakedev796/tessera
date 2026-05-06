@@ -21,6 +21,7 @@ Open source | Claude Code + Codex + OpenCode | Full CLI workflows in UI | From i
 |------|---------|
 | [Download Latest Release](https://github.com/horang-labs/tessera/releases) | Get the Windows or macOS desktop beta |
 | [npm package](https://www.npmjs.com/package/@horang-labs/tessera) | Install the browser runtime |
+| [Product Hunt launch][product-hunt] | Support Tessera on Product Hunt |
 | [Team design partner waitlist][design-partner-waitlist] | Help shape team workspaces, permissions, and enterprise adoption |
 | [GitHub Issues](https://github.com/horang-labs/tessera/issues) | Report bugs, rough edges, and feature ideas |
 
@@ -322,3 +323,4 @@ See the [LICENSE](LICENSE) file for the full text.
 Claude Code is a trademark of Anthropic. Codex and OpenAI are trademarks of OpenAI. Tessera is not affiliated with or endorsed by Anthropic or OpenAI.
 
 [design-partner-waitlist]: https://docs.google.com/forms/d/e/1FAIpQLSdbo5haZdekBrQNwt_F-UlloQu-s4SkUV4tZCU0cONwKJX8Tw/viewform
+[product-hunt]: https://www.producthunt.com/posts/tessera-6
