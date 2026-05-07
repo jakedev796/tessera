@@ -33,7 +33,7 @@ export async function reloadBoardData(): Promise<void> {
   await Promise.all(
     targetProjectIds.flatMap((projectId) => [
       useTaskStore.getState().loadTasks(projectId),
-      useCollectionStore.getState().loadCollections(projectId),
+      useCollectionStore.getState().loadCollections(projectId, { force: true }),
     ]),
   );
 }

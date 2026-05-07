@@ -12,16 +12,19 @@ import type { UnifiedSession } from '@/types/chat';
 
 interface PopoutElectronApi {
   isElectron?: boolean;
-  popoutOpenSession?: (sessionId: string) => void;
+  popoutOpenSession?: (sessionId: string, action?: 'preview' | 'pin') => void;
 }
 
-function tryForwardClickToMainWindow(sessionId: string): boolean {
+export function tryForwardClickToMainWindow(
+  sessionId: string,
+  action: 'preview' | 'pin' = 'preview'
+): boolean {
   if (typeof window === 'undefined') return false;
   const popoutFlag = (window as Window & { __TESSERA_POPOUT__?: boolean }).__TESSERA_POPOUT__;
   if (!popoutFlag) return false;
   const electronApi = (window as Window & { electronAPI?: PopoutElectronApi }).electronAPI;
   if (!electronApi?.isElectron || !electronApi.popoutOpenSession) return false;
-  electronApi.popoutOpenSession(sessionId);
+  electronApi.popoutOpenSession(sessionId, action);
   return true;
 }
 
@@ -98,7 +101,7 @@ export function useSessionClickHandlers(options?: {
 
       // When inside the popout board window, forward to main window
       // so the task opens there, then return without local navigation.
-      if (tryForwardClickToMainWindow(session.id)) {
+      if (tryForwardClickToMainWindow(session.id, 'preview')) {
         return;
       }
 
@@ -130,7 +133,7 @@ export function useSessionClickHandlers(options?: {
   // Handle session double-click — always opens as pinned tab
   const handleSessionDoubleClick = useCallback(
     async (session: UnifiedSession): Promise<void> => {
-      if (tryForwardClickToMainWindow(session.id)) {
+      if (tryForwardClickToMainWindow(session.id, 'pin')) {
         return;
       }
       const tabStore = useTabStore.getState();

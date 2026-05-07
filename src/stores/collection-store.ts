@@ -5,6 +5,8 @@ import { useTaskStore } from './task-store';
 
 interface LoadCollectionsOptions {
   setCurrent?: boolean;
+  /** Bypass the per-project loaded cache and refetch from the API. */
+  force?: boolean;
 }
 
 interface CollectionState {
@@ -108,9 +110,10 @@ export const useCollectionStore = create<CollectionState>((set, get) => ({
 
   loadCollections: async (projectId, options) => {
     const shouldSetCurrent = options?.setCurrent !== false;
+    const force = options?.force === true;
     const currentState = get();
 
-    if (currentState.loadedProjects[projectId]) {
+    if (!force && currentState.loadedProjects[projectId]) {
       if (shouldSetCurrent) {
         set({
           collections: currentState.collectionsByProject[projectId] ?? [],

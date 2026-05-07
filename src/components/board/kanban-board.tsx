@@ -12,7 +12,10 @@ import { useSettingsStore } from '@/stores/settings-store';
 import { getProviderSessionRuntimeConfig } from '@/lib/settings/provider-defaults';
 import { captureTelemetryEvent } from '@/lib/telemetry/client';
 import { useSessionCrud } from '@/hooks/use-session-crud';
-import { useSessionClickHandlers } from '@/hooks/use-session-click-handlers';
+import {
+  useSessionClickHandlers,
+  tryForwardClickToMainWindow,
+} from '@/hooks/use-session-click-handlers';
 import { setKanbanChatDragData } from '@/lib/dnd/panel-session-drag';
 import { WORKFLOW_STATUS_ORDER } from '@/types/task-entity';
 import type { WorkflowStatus, TaskEntity } from '@/types/task-entity';
@@ -547,6 +550,7 @@ export const KanbanBoard = memo(function KanbanBoard() {
   }, [renameSession]);
 
   const handleCardOpenInNewTab = useCallback(async (taskId: string) => {
+    if (tryForwardClickToMainWindow(taskId, 'pin')) return;
     useTabStore.getState().createTabWithSession(taskId);
   }, []);
 
@@ -710,7 +714,9 @@ export const KanbanBoard = memo(function KanbanBoard() {
     if (!taskMenuAnchor) return;
     const primarySession = taskMenuAnchor.task.sessions[0];
     if (primarySession) {
-      useTabStore.getState().createTabWithSession(primarySession.id);
+      if (!tryForwardClickToMainWindow(primarySession.id, 'pin')) {
+        useTabStore.getState().createTabWithSession(primarySession.id);
+      }
     }
     setTaskMenuAnchor(null);
   }, [taskMenuAnchor]);

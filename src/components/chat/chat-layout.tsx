@@ -409,15 +409,24 @@ export function ChatLayout() {
     const electronApi = (window as Window & {
       electronAPI?: {
         isElectron?: boolean;
-        onPopoutOpenSession?: (cb: (sessionId: string) => void) => (() => void) | void;
+        onPopoutOpenSession?: (
+          cb: (payload: { sessionId: string; action: 'preview' | 'pin' }) => void
+        ) => (() => void) | void;
       };
     }).electronAPI;
     if (!electronApi?.isElectron || !electronApi.onPopoutOpenSession) return;
-    const cleanup = electronApi.onPopoutOpenSession((sessionId) => {
+    const cleanup = electronApi.onPopoutOpenSession(({ sessionId, action }) => {
       if (!sessionId) return;
       const tabStore = useTabStore.getState();
       const location = tabStore.findSessionLocation(sessionId);
-      if (location) {
+      if (action === 'pin') {
+        if (location) {
+          tabStore.setActiveTab(location.tabId);
+          tabStore.pinTab(location.tabId);
+        } else {
+          tabStore.createTabWithSession(sessionId);
+        }
+      } else if (location) {
         tabStore.setActiveTab(location.tabId);
         usePanelStore.getState().setActivePanelId(location.panelId);
       } else {

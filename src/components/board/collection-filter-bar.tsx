@@ -5,11 +5,15 @@ import { Tag, ExternalLink } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Tooltip } from '@/components/ui/tooltip';
 import { useI18n } from '@/lib/i18n';
+import { useBoardStore } from '@/stores/board-store';
 import type { Collection } from '@/types/collection';
 
 interface ElectronApiBoardPopout {
   isElectron?: boolean;
-  openBoardWindow?: () => Promise<unknown>;
+  openBoardWindow?: (payload?: {
+    projectDir?: string | null;
+    collectionFilter?: string | null;
+  }) => Promise<unknown>;
 }
 
 function getBoardPopoutApi(): ElectronApiBoardPopout | undefined {
@@ -118,7 +122,11 @@ export const CollectionFilterBar = memo(function CollectionFilterBar({
   const canPopout = Boolean(electronApi?.isElectron && electronApi.openBoardWindow) && !isPopoutWindow();
 
   const handlePopout = useCallback(() => {
-    void electronApi?.openBoardWindow?.();
+    const { selectedProjectDir, activeCollectionFilter } = useBoardStore.getState();
+    void electronApi?.openBoardWindow?.({
+      projectDir: selectedProjectDir,
+      collectionFilter: activeCollectionFilter,
+    });
   }, [electronApi]);
 
   return (

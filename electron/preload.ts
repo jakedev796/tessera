@@ -26,7 +26,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
     section: 'file' | 'edit' | 'view' | 'window' | 'help',
     anchor: { x: number; y: number }
   ) => ipcRenderer.invoke('titlebar-popup-menu', section, anchor),
-  openBoardWindow: () => ipcRenderer.invoke('open-board-window'),
+  openBoardWindow: (payload?: { projectDir?: string | null; collectionFilter?: string | null }) =>
+    ipcRenderer.invoke('open-board-window', payload),
   closeBoardPopouts: () => ipcRenderer.invoke('close-board-popouts'),
   getPopoutState: () => ipcRenderer.invoke('get-popout-state'),
   onPopoutStateChanged: (callback: (count: number) => void) => {
@@ -40,13 +41,18 @@ contextBridge.exposeInMainWorld('electronAPI', {
       ipcRenderer.removeListener('popout-state-changed', listener);
     };
   },
-  popoutOpenSession: (sessionId: string) =>
-    ipcRenderer.send('popout-open-session', sessionId),
-  onPopoutOpenSession: (callback: (sessionId: string) => void) => {
-    const listener = (_event: Electron.IpcRendererEvent, payload: { sessionId?: string }) => {
-      if (typeof payload?.sessionId === 'string') {
-        callback(payload.sessionId);
-      }
+  popoutOpenSession: (sessionId: string, action: 'preview' | 'pin' = 'preview') =>
+    ipcRenderer.send('popout-open-session', { sessionId, action }),
+  onPopoutOpenSession: (
+    callback: (payload: { sessionId: string; action: 'preview' | 'pin' }) => void
+  ) => {
+    const listener = (
+      _event: Electron.IpcRendererEvent,
+      payload: { sessionId?: string; action?: string }
+    ) => {
+      if (typeof payload?.sessionId !== 'string') return;
+      const action: 'preview' | 'pin' = payload.action === 'pin' ? 'pin' : 'preview';
+      callback({ sessionId: payload.sessionId, action });
     };
     ipcRenderer.on('popout-open-session', listener);
     return () => {

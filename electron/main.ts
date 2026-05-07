@@ -709,9 +709,24 @@ function broadcastPopoutState(): void {
 
 // ── IPC ────────────────────────────────────────────────────────────────────
 ipcMain.handle('get-server-port', () => serverPort);
-ipcMain.handle('open-board-window', () => {
+ipcMain.handle('open-board-window', (_event, payload?: unknown) => {
   if (!serverPort) return { ok: false };
-  const win = createPopoutWindow(serverPort, '/board-popout');
+  const params = new URLSearchParams();
+  if (payload && typeof payload === 'object') {
+    const { projectDir, collectionFilter } = payload as {
+      projectDir?: unknown;
+      collectionFilter?: unknown;
+    };
+    if (typeof projectDir === 'string' && projectDir.length > 0) {
+      params.set('projectDir', projectDir);
+    }
+    if (typeof collectionFilter === 'string' && collectionFilter.length > 0) {
+      params.set('collectionFilter', collectionFilter);
+    }
+  }
+  const query = params.toString();
+  const route = query ? `/board-popout?${query}` : '/board-popout';
+  const win = createPopoutWindow(serverPort, route);
   return { ok: true, windowId: win.id };
 });
 ipcMain.handle('close-board-popouts', () => {
@@ -721,13 +736,19 @@ ipcMain.handle('close-board-popouts', () => {
   return { ok: true };
 });
 ipcMain.handle('get-popout-state', () => ({ count: popoutWindows.size }));
-ipcMain.on('popout-open-session', (_event, sessionId: unknown) => {
+ipcMain.on('popout-open-session', (_event, payload: unknown) => {
+  if (!payload || typeof payload !== 'object') return;
+  const { sessionId, action } = payload as { sessionId?: unknown; action?: unknown };
   if (typeof sessionId !== 'string' || !sessionId) return;
+  const resolvedAction: 'preview' | 'pin' = action === 'pin' ? 'pin' : 'preview';
   if (!mainWindow || mainWindow.isDestroyed()) return;
   if (mainWindow.isMinimized()) mainWindow.restore();
   if (!mainWindow.isVisible()) mainWindow.show();
   mainWindow.focus();
-  mainWindow.webContents.send('popout-open-session', { sessionId });
+  mainWindow.webContents.send('popout-open-session', {
+    sessionId,
+    action: resolvedAction,
+  });
 });
 ipcMain.on(
   'window-close-response',

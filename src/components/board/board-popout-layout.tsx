@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import dynamic from 'next/dynamic';
 import { useSessionStore } from '@/stores/session-store';
 import { useBoardStore } from '@/stores/board-store';
@@ -11,6 +11,20 @@ import { ElectronTitlebarThemeSync } from '@/components/layout/electron-titlebar
 import { KeyboardShortcutProvider } from '@/components/keyboard/keyboard-shortcut-provider';
 import { ALL_PROJECTS_SENTINEL } from '@/lib/constants/project-strip';
 import { cn } from '@/lib/utils';
+
+interface PopoutHydrationParams {
+  projectDir: string | null;
+  collectionFilter: string | null;
+}
+
+function readPopoutHydrationParams(): PopoutHydrationParams {
+  if (typeof window === 'undefined') return { projectDir: null, collectionFilter: null };
+  const params = new URLSearchParams(window.location.search);
+  return {
+    projectDir: params.get('projectDir'),
+    collectionFilter: params.get('collectionFilter'),
+  };
+}
 
 const KanbanBoard = dynamic(
   () => import('@/components/board/kanban-board').then((m) => m.KanbanBoard),
@@ -28,6 +42,19 @@ export function BoardPopoutLayout() {
   const isElectronTitlebar = isMacElectron || isWindowsElectron;
   const projects = useSessionStore((s) => s.projects);
   const [projectsLoaded, setProjectsLoaded] = useState(projects.length > 0);
+  const hydrationRef = useRef<PopoutHydrationParams>({ projectDir: null, collectionFilter: null });
+  const hasHydratedRef = useRef(false);
+
+  if (!hasHydratedRef.current && typeof window !== 'undefined') {
+    hasHydratedRef.current = true;
+    const params = readPopoutHydrationParams();
+    hydrationRef.current = params;
+    const boardState = useBoardStore.getState();
+    if (params.projectDir) {
+      boardState.setSelectedProjectDir(params.projectDir);
+    }
+    boardState.setCollectionFilter(params.collectionFilter ?? null);
+  }
 
   useWebSocket();
 
@@ -88,7 +115,11 @@ export function BoardPopoutLayout() {
           </div>
         )}
         <div className="flex flex-1 overflow-hidden">
-          <ProjectStrip onAddProject={() => {}} onRemoveProject={() => {}} />
+          <ProjectStrip
+            onAddProject={() => {}}
+            onRemoveProject={() => {}}
+            hideManagementActions
+          />
           <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
             <KanbanBoard />
           </div>

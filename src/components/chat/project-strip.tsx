@@ -22,9 +22,18 @@ import { useI18n } from '@/lib/i18n';
 interface ProjectStripProps {
   onAddProject: () => void;
   onRemoveProject?: (encodedDir: string) => void;
+  /**
+   * When true, hide management actions that don't make sense in the popout
+   * board window (add project, remove project, bottom action stack).
+   */
+  hideManagementActions?: boolean;
 }
 
-export function ProjectStrip({ onAddProject, onRemoveProject }: ProjectStripProps) {
+export function ProjectStrip({
+  onAddProject,
+  onRemoveProject,
+  hideManagementActions = false,
+}: ProjectStripProps) {
   const { t } = useI18n();
   const projects = useSessionStore((state) => state.projects);
   const selectedProjectDir = useBoardStore((state) => state.selectedProjectDir);
@@ -41,8 +50,9 @@ export function ProjectStrip({ onAddProject, onRemoveProject }: ProjectStripProp
 
   const handleContextMenu = useCallback((e: React.MouseEvent, encodedDir: string, displayName: string) => {
     e.preventDefault();
+    if (hideManagementActions) return;
     setContextMenu({ x: e.clientX, y: e.clientY, encodedDir, displayName });
-  }, []);
+  }, [hideManagementActions]);
 
   const handleProjectSelect = useCallback((projectDir: string) => {
     setSelectedProjectDir(projectDir);
@@ -100,15 +110,17 @@ export function ProjectStrip({ onAddProject, onRemoveProject }: ProjectStripProp
       )}
 
       {/* Add project button */}
-      <Tooltip content={t('projectStrip.addProject')} delay={300}>
-        <button
-          onClick={onAddProject}
-          className="w-11 h-9 flex items-center justify-center shrink-0 text-(--text-muted) hover:text-(--sidebar-text-active) transition-colors"
-          data-testid="project-strip-add"
-        >
-          <Plus className="w-4 h-4" />
-        </button>
-      </Tooltip>
+      {!hideManagementActions && (
+        <Tooltip content={t('projectStrip.addProject')} delay={300}>
+          <button
+            onClick={onAddProject}
+            className="w-11 h-9 flex items-center justify-center shrink-0 text-(--text-muted) hover:text-(--sidebar-text-active) transition-colors"
+            data-testid="project-strip-add"
+          >
+            <Plus className="w-4 h-4" />
+          </button>
+        </Tooltip>
+      )}
 
       {/* All Projects button */}
       <Tooltip content={t('projectStrip.allProjects')} delay={300}>
@@ -182,6 +194,7 @@ export function ProjectStrip({ onAddProject, onRemoveProject }: ProjectStripProp
       <div className="w-6 mx-auto border-t border-(--divider)" />
 
       {/* Global action icons */}
+      {!hideManagementActions && (
       <div className="flex flex-col items-center shrink-0">
         <NotificationBell direction="right" />
         <Tooltip content={t('skill.dashboardTitle')} delay={300}>
@@ -236,6 +249,7 @@ export function ProjectStrip({ onAddProject, onRemoveProject }: ProjectStripProp
           </Tooltip>
         )}
       </div>
+      )}
 
       {/* Context menu portal */}
       {contextMenu && typeof document !== 'undefined' && createPortal(
