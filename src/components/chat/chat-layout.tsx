@@ -422,6 +422,7 @@ export function ChatLayout() {
       if (action === 'pin') {
         if (location) {
           tabStore.setActiveTab(location.tabId);
+          usePanelStore.getState().setActivePanelId(location.panelId);
           tabStore.pinTab(location.tabId);
         } else {
           tabStore.createTabWithSession(sessionId);

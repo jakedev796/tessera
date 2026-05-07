@@ -84,6 +84,9 @@ export const KanbanBoard = memo(function KanbanBoard() {
   const collections = useCollectionStore((s) =>
     selectedProjectDir ? s.collectionsByProject[selectedProjectDir] ?? EMPTY_COLLECTIONS : EMPTY_COLLECTIONS
   );
+  const collectionsLoadedForProject = useCollectionStore((s) =>
+    selectedProjectDir ? Boolean(s.loadedProjects[selectedProjectDir]) : false
+  );
 
   // Task store
   const tasks = useTaskStore((s) => s.tasks);
@@ -326,9 +329,13 @@ export const KanbanBoard = memo(function KanbanBoard() {
 
   useEffect(() => {
     if (!activeCollectionFilter) return;
+    // Don't clear the filter while collections are still loading -- otherwise a
+    // popout opened with a hydrated filter would see an empty collection list
+    // and reset itself before loadCollections() resolves.
+    if (!collectionsLoadedForProject) return;
     if (collections.some((collection) => collection.id === activeCollectionFilter)) return;
     setCollectionFilter(null);
-  }, [activeCollectionFilter, collections, setCollectionFilter]);
+  }, [activeCollectionFilter, collections, collectionsLoadedForProject, setCollectionFilter]);
 
   const selectedProject = useMemo(() => {
     return projects.find((project) => project.encodedDir === selectedProjectDir) ?? null;
