@@ -96,7 +96,7 @@ export function useSessionClickHandlers(options?: {
         wsClient.sendMarkAsRead(session.id);
       }
 
-      // BRANCH B0 — When inside the popout board window, forward to main window
+      // When inside the popout board window, forward to main window
       // so the task opens there, then return without local navigation.
       if (tryForwardClickToMainWindow(session.id)) {
         return;
