@@ -9,6 +9,7 @@ import { processManager } from './src/lib/cli/process-manager';
 import { rateLimitPoller } from './src/lib/rate-limit/poller';
 import { taskPrPoller } from './src/lib/github/task-pr-poller';
 import { installTaskPrStatusBroadcast, uninstallTaskPrStatusBroadcast } from './src/lib/github/task-pr-broadcast';
+import { installSessionPrStatusBroadcast, uninstallSessionPrStatusBroadcast } from './src/lib/github/session-pr-broadcast';
 import { ensureRSAKeys } from './src/lib/auth/keys';
 import { readUsersFile } from './src/lib/users';
 import { SettingsManager } from './src/lib/settings/manager';
@@ -77,6 +78,7 @@ async function startServer() {
 
     // Start task PR poller + relay updates to connected clients
     installTaskPrStatusBroadcast((msg) => wsServer.broadcast(msg));
+    installSessionPrStatusBroadcast((msg) => wsServer.broadcast(msg));
     void taskPrPoller.start();
 
     logger.info({
@@ -124,6 +126,7 @@ async function startServer() {
       logger.info('Stopping task PR poller...');
       taskPrPoller.stop();
       uninstallTaskPrStatusBroadcast();
+      uninstallSessionPrStatusBroadcast();
 
       // processManager.cleanup() kills every spawned CLI plus its process
       // group (spawn-cli-runtime marks children as detached: true on Unix,

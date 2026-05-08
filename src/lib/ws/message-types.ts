@@ -326,6 +326,13 @@ export type AppServerMessage =
       remoteBranchExists?: boolean;
     }
   | {
+      type: 'session_pr_status_update';
+      sessionId: string;
+      prStatus?: import('@/types/task-pr-status').TaskPrStatus;
+      prUnsupported: boolean;
+      remoteBranchExists?: boolean;
+    }
+  | {
       type: 'git_panel_state';
       sessionId: string;
       data: import('@/types/git').GitPanelData;

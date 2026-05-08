@@ -11,6 +11,7 @@ import { getElectronAuthUserId } from '@/lib/auth/electron-user';
 import { SettingsManager } from '@/lib/settings/manager';
 import type { AgentEnvironment } from '@/lib/settings/types';
 import { syncAllEligibleTaskPrs } from './task-pr-sync';
+import { syncAllEligibleSessionPrs } from './session-pr-sync';
 
 // 60s strikes a balance between staleness and gh-CLI / GitHub-API load.
 // The probe coalesces in-flight requests per task and only writes the DB
@@ -61,10 +62,12 @@ class TaskPrPoller {
     this.running = true;
     try {
       const startedAt = Date.now();
-      await syncAllEligibleTaskPrs({ agentEnvironment: await resolvePollerAgentEnvironment() });
-      logger.debug({ reason, durationMs: Date.now() - startedAt }, 'Task PR poll complete');
+      const agentEnvironment = await resolvePollerAgentEnvironment();
+      await syncAllEligibleTaskPrs({ agentEnvironment });
+      await syncAllEligibleSessionPrs({ agentEnvironment });
+      logger.debug({ reason, durationMs: Date.now() - startedAt }, 'PR poll complete');
     } catch (err) {
-      logger.error({ err, reason }, 'Task PR poll error');
+      logger.error({ err, reason }, 'PR poll error');
     } finally {
       this.running = false;
     }

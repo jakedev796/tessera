@@ -185,6 +185,22 @@ export function getSessionsByWorkDir(workDir: string): Array<Pick<SessionRow, 'i
 }
 
 /**
+ * Sessions that the bare-session PR poller should sweep: have a working
+ * directory, are not bound to a task (those flow through task-pr-sync),
+ * and aren't soft-deleted or archived.
+ */
+export function getSessionsEligibleForBareSessionPrSync(): Array<Pick<SessionRow, 'id' | 'work_dir'>> {
+  return getDb().prepare(`
+    SELECT id, work_dir
+    FROM sessions
+    WHERE deleted = 0
+      AND archived = 0
+      AND task_id IS NULL
+      AND work_dir IS NOT NULL
+  `).all() as Array<Pick<SessionRow, 'id' | 'work_dir'>>;
+}
+
+/**
  * Clear worktree metadata for all sessions that reference the given work_dir.
  */
 export function clearWorktreeMetadataByWorkDir(workDir: string): void {

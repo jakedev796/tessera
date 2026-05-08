@@ -14,6 +14,7 @@ import { useGitPanelStore } from '@/stores/git-panel-store';
 import { useNotificationStore } from '@/stores/notification-store';
 import { useRateLimitStore } from '@/stores/rate-limit-store';
 import { useSessionStore } from '@/stores/session-store';
+import { useSessionPrStore } from '@/stores/session-pr-store';
 import { useSkillAnalysisStore } from '@/stores/skill-analysis-store';
 import { useTaskStore } from '@/stores/task-store';
 import { useUsageStore } from '@/stores/usage-store';
@@ -182,6 +183,15 @@ export function handleIncomingServerMessage({
     case 'task_pr_status_update':
       useTaskStore.getState().applyPrStatusUpdate(
         msg.taskId,
+        msg.prStatus,
+        msg.prUnsupported,
+        msg.remoteBranchExists,
+      );
+      return { wasReconnect };
+
+    case 'session_pr_status_update':
+      useSessionPrStore.getState().applyPrStatusUpdate(
+        msg.sessionId,
         msg.prStatus,
         msg.prUnsupported,
         msg.remoteBranchExists,
