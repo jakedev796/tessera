@@ -2,6 +2,7 @@ import { create } from 'zustand';
 import { useSessionStore } from './session-store';
 import { useTaskStore } from './task-store';
 import { toast } from './notification-store';
+import { fetchWithClientId } from '@/lib/api/fetch-with-client-id';
 
 interface SelectionState {
   /** Set of selected session IDs */
@@ -129,7 +130,7 @@ export const useSelectionStore = create<SelectionState>((set, get) => ({
 
     for (const id of ids) {
       try {
-        const res = await fetch(`/api/sessions/${encodeURIComponent(id)}`, {
+        const res = await fetchWithClientId(`/api/sessions/${encodeURIComponent(id)}`, {
           method: 'DELETE',
         });
         if (res.ok) {

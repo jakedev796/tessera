@@ -31,6 +31,13 @@ export function getCollections(projectId: string): CollectionRow[] {
 /**
  * Check if a collection exists by ID.
  */
+export function getCollectionProjectId(id: string): string | undefined {
+  const row = getDb()
+    .prepare('SELECT project_id FROM collections WHERE id = ?')
+    .get(id) as { project_id: string } | undefined;
+  return row?.project_id;
+}
+
 export function collectionExists(id: string, projectId?: string): boolean {
   const row = projectId
     ? getDb()

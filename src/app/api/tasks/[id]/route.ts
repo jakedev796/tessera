@@ -8,6 +8,11 @@ import { sessionOrchestrator } from '@/lib/session/session-orchestrator';
 import { syncSingleSessionSessionTitleFromTask } from '@/lib/task-title-sync';
 import { suppressDiffAutoPromoteForTask } from '@/lib/git/worktree-diff-auto-promote';
 import { getCachedDiffStats } from '@/lib/git/worktree-diff-stats-cache';
+import {
+  broadcastSessionMutation,
+  broadcastTaskMutation,
+  getOriginClientIdFromRequest,
+} from '@/lib/ws/mutation-broadcast';
 
 /**
  * GET /api/tasks/[id]
@@ -126,6 +131,19 @@ export async function PATCH(
       });
     }
     logger.info({ taskId: id, ...patch }, 'Task updated');
+    const originClientId = getOriginClientIdFromRequest(req);
+    broadcastTaskMutation(auth.userId, {
+      kind: 'updated',
+      projectId: task.projectId,
+      originClientId,
+    });
+    if (patch.workflow_status !== undefined) {
+      broadcastSessionMutation(auth.userId, {
+        kind: 'updated',
+        projectId: task.projectId,
+        originClientId,
+      });
+    }
     return NextResponse.json({ ok: true });
   } catch (err: unknown) {
     logger.error({ id, error: err }, 'Failed to update task');
@@ -159,6 +177,17 @@ export async function DELETE(
     const { deletedSessionCount: fallbackDeletedSessionCount } = dbTasks.deleteTask(id);
     const deletedSessionCount = task.sessions.length + fallbackDeletedSessionCount;
     logger.info({ taskId: id, deletedSessionCount }, 'Task deleted via API');
+    const originClientId = getOriginClientIdFromRequest(req);
+    broadcastTaskMutation(auth.userId, {
+      kind: 'deleted',
+      projectId: task.projectId,
+      originClientId,
+    });
+    broadcastSessionMutation(auth.userId, {
+      kind: 'updated',
+      projectId: task.projectId,
+      originClientId,
+    });
     return NextResponse.json({
       ok: true,
       deletedSessionCount,

@@ -17,8 +17,11 @@ import { useSessionStore } from '@/stores/session-store';
 import { useSkillAnalysisStore } from '@/stores/skill-analysis-store';
 import { useTaskStore } from '@/stores/task-store';
 import { useUsageStore } from '@/stores/usage-store';
+import { useCollectionStore } from '@/stores/collection-store';
 import { i18n } from '@/lib/i18n';
 import type { ServerTransportMessage } from './message-types';
+import { getClientId } from './client-id';
+import { fetchWithClientId } from '@/lib/api/fetch-with-client-id';
 
 interface HandleIncomingServerMessageOptions {
   msg: ServerTransportMessage;
@@ -188,6 +191,30 @@ export function handleIncomingServerMessage({
       );
       return { wasReconnect };
 
+    case 'session_mutated':
+      if (msg.originClientId && msg.originClientId === getClientId()) {
+        return { wasReconnect };
+      }
+      void useSessionStore.getState().loadProjects();
+      if (msg.projectId) {
+        void useTaskStore.getState().loadTasks(msg.projectId, { setCurrent: false });
+      }
+      return { wasReconnect };
+
+    case 'task_mutated':
+      if (msg.originClientId && msg.originClientId === getClientId()) {
+        return { wasReconnect };
+      }
+      void useTaskStore.getState().loadTasks(msg.projectId, { setCurrent: false });
+      return { wasReconnect };
+
+    case 'collection_mutated':
+      if (msg.originClientId && msg.originClientId === getClientId()) {
+        return { wasReconnect };
+      }
+      void useCollectionStore.getState().loadCollections(msg.projectId, { force: true, setCurrent: false });
+      return { wasReconnect };
+
     case 'git_panel_state':
       useGitPanelStore.getState().applyGitPanelData(msg.sessionId, msg.data);
       if (msg.data.diffStats !== undefined) {
@@ -322,7 +349,7 @@ function handleSessionTitleUpdatedMessage(
       onClick: () => {
         sessionStore.updateSessionTitle(msg.sessionId, previousTitle, false);
         useTaskStore.getState().syncLinkedTaskTitle(msg.sessionId, previousTitle);
-        fetch(`/api/sessions/${msg.sessionId}/rename`, {
+        fetchWithClientId(`/api/sessions/${msg.sessionId}/rename`, {
           method: 'PATCH',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ title: previousTitle }),

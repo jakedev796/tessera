@@ -4,6 +4,7 @@ import { generateAITitle } from '@/lib/session/ai-title-generator';
 import * as dbSessions from '@/lib/db/sessions';
 import logger from '@/lib/logger';
 import { syncSingleSessionTaskTitleFromSession } from '@/lib/task-title-sync';
+import { broadcastSessionMutation, getOriginClientIdFromRequest } from '@/lib/ws/mutation-broadcast';
 
 /**
  * POST /api/sessions/[id]/generate-title
@@ -36,6 +37,12 @@ export async function POST(
     syncSingleSessionTaskTitleFromSession(sessionId, result.title);
 
     logger.info({ userId, sessionId, title: result.title }, 'AI title saved to DB');
+
+    broadcastSessionMutation(userId, {
+      kind: 'updated',
+      projectId: dbSessions.getSession(sessionId)?.project_id,
+      originClientId: getOriginClientIdFromRequest(req),
+    });
 
     return NextResponse.json({
       success: true,

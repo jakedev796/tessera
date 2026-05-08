@@ -10,10 +10,12 @@ import {
 } from '@/lib/chat/session-client-effects';
 import { handleIncomingServerMessage } from './client-message-handlers';
 import { applyOptimisticUserMessage, buildClientRequest } from './client-transport';
+import { getClientId } from './client-id';
 
 type ServerMessageListener = (msg: ServerTransportMessage) => void;
 
 export class WebSocketClient {
+  readonly clientId: string = getClientId();
   private ws: WebSocket | null = null;
   private reconnectAttempt = 0;
   private readonly MAX_RECONNECT_ATTEMPTS = 5;

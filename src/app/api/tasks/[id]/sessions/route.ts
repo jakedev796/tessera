@@ -1,6 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { requireAuthenticatedUserId } from '@/lib/auth/api-auth';
 import * as dbTasks from '@/lib/db/tasks';
+import {
+  broadcastSessionMutation,
+  broadcastTaskMutation,
+  getOriginClientIdFromRequest,
+} from '@/lib/ws/mutation-broadcast';
 import logger from '@/lib/logger';
 
 /**
@@ -17,7 +22,8 @@ export async function POST(
 
   const { id: taskId } = await params;
 
-  if (!dbTasks.taskExists(taskId)) {
+  const taskRow = dbTasks.getTask(taskId);
+  if (!taskRow) {
     return NextResponse.json({ error: 'Task not found' }, { status: 404 });
   }
 
@@ -37,6 +43,17 @@ export async function POST(
   try {
     dbTasks.addSessionToTask(taskId, sessionId.trim());
     logger.info({ taskId, sessionId }, 'Session added to task via API');
+    const originClientId = getOriginClientIdFromRequest(req);
+    broadcastSessionMutation(auth.userId, {
+      kind: 'created',
+      projectId: taskRow.projectId,
+      originClientId,
+    });
+    broadcastTaskMutation(auth.userId, {
+      kind: 'updated',
+      projectId: taskRow.projectId,
+      originClientId,
+    });
     return NextResponse.json({ ok: true });
   } catch (err: unknown) {
     logger.error({ taskId, sessionId, error: err }, 'Failed to add session to task');

@@ -6,6 +6,7 @@ import { useTaskStore } from '@/stores/task-store';
 import { useSettingsStore } from '@/stores/settings-store';
 import { toast } from '@/stores/notification-store';
 import logger from '@/lib/logger';
+import { fetchWithClientId } from '@/lib/api/fetch-with-client-id';
 import type { TaskEntity, WorkflowStatus } from '@/types/task-entity';
 
 interface CreateWorktreeSessionOptions {
@@ -162,7 +163,7 @@ export function useWorktreeSession() {
         let createdTaskId: string | null = null;
         if (tempId && taskTitle) {
           try {
-            const taskRes = await fetch('/api/tasks', {
+            const taskRes = await fetchWithClientId('/api/tasks', {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({

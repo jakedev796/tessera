@@ -30,6 +30,7 @@ import { DeleteSessionDialog } from '@/components/chat/delete-session-dialog';
 import { DeleteTaskDialog } from '@/components/chat/delete-task-dialog';
 import { MoveProjectDialog } from '@/components/chat/move-project-dialog';
 import { wsClient } from '@/lib/ws/client';
+import { fetchWithClientId } from '@/lib/api/fetch-with-client-id';
 import {
   getKanbanScrollPosition,
   getKanbanScrollPositionKey,
@@ -612,7 +613,7 @@ export const KanbanBoard = memo(function KanbanBoard() {
       }
       const runtimeConfig = getProviderSessionRuntimeConfig(settings, providerId);
 
-      const res = await fetch('/api/sessions', {
+      const res = await fetchWithClientId('/api/sessions', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

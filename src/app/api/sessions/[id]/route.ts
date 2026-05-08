@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { requireAuthenticatedUserId } from '@/lib/auth/api-auth';
 import { sessionOrchestrator } from '@/lib/session/session-orchestrator';
+import { getSession } from '@/lib/db/sessions';
+import { broadcastSessionMutation, getOriginClientIdFromRequest } from '@/lib/ws/mutation-broadcast';
 import logger from '@/lib/logger';
 
 /**
@@ -30,9 +32,18 @@ export async function DELETE(
   }
 
   try {
+    const sessionRow = getSession(sessionId);
+    const projectId = sessionRow?.project_id;
+
     await sessionOrchestrator.deleteSession(userId, sessionId);
 
     logger.info({ userId, sessionId }, 'Session deleted via API');
+
+    broadcastSessionMutation(userId, {
+      kind: 'deleted',
+      projectId,
+      originClientId: getOriginClientIdFromRequest(request),
+    });
 
     return NextResponse.json({ success: true });
   } catch (err: any) {

@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { sessionOrchestrator } from '@/lib/session/session-orchestrator';
 import { requireAuthenticatedUserId } from '@/lib/auth/api-auth';
+import { getSession } from '@/lib/db/sessions';
+import { broadcastSessionMutation, getOriginClientIdFromRequest } from '@/lib/ws/mutation-broadcast';
 import logger from '@/lib/logger';
 
 /**
@@ -31,6 +33,12 @@ export async function PATCH(
     await sessionOrchestrator.renameSession(userId, sessionId, title);
 
     logger.info({ userId, sessionId, title }, 'Session renamed via API');
+
+    broadcastSessionMutation(userId, {
+      kind: 'updated',
+      projectId: getSession(sessionId)?.project_id,
+      originClientId: getOriginClientIdFromRequest(req),
+    });
 
     return NextResponse.json({ success: true, title });
   } catch (err: any) {

@@ -191,7 +191,9 @@ export function ProjectStrip({
         </div>
       </ScrollArea>
 
-      <div className="w-6 mx-auto border-t border-(--divider)" />
+      {!hideManagementActions && (
+        <div className="w-6 mx-auto border-t border-(--divider)" />
+      )}
 
       {/* Global action icons */}
       {!hideManagementActions && (

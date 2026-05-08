@@ -6,6 +6,7 @@ import * as dbTasks from '@/lib/db/tasks';
 import { collectionExists } from '@/lib/db/collections';
 import { generateTaskId } from '@/types/task-entity';
 import { getCachedOrScheduleBulk } from '@/lib/git/worktree-diff-stats-bulk';
+import { broadcastTaskMutation, getOriginClientIdFromRequest } from '@/lib/ws/mutation-broadcast';
 import logger from '@/lib/logger';
 
 async function pathExists(candidate: string): Promise<boolean> {
@@ -121,6 +122,11 @@ export async function POST(req: NextRequest) {
     const activeSessionIds = processManager.getActiveSessionIds();
     const task = dbTasks.getTask(id, activeSessionIds);
     logger.info({ taskId: id, projectId }, 'Task created via API');
+    broadcastTaskMutation(auth.userId, {
+      kind: 'created',
+      projectId: projectId.trim(),
+      originClientId: getOriginClientIdFromRequest(req),
+    });
     return NextResponse.json({ task }, { status: 201 });
   } catch (err: unknown) {
     logger.error({ error: err }, 'Failed to create task');

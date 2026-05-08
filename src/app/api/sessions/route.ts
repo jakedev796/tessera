@@ -5,6 +5,7 @@ import { collectionExists } from '@/lib/db/collections';
 import { taskExists } from '@/lib/db/tasks';
 import logger from '@/lib/logger';
 import { persistCreatedSessionRecord } from '@/lib/session/session-persistence';
+import { broadcastSessionMutation, getOriginClientIdFromRequest } from '@/lib/ws/mutation-broadcast';
 
 /**
  * POST /api/sessions - Create a new session (pending; CLI spawns on first message)
@@ -101,6 +102,12 @@ export async function POST(req: NextRequest) {
         collectionId: typeof collectionId === 'string' && collectionId.trim().length > 0 ? collectionId.trim() : undefined,
         hasCustomTitle: hasCustomTitle === true,
         worktreeBranch: normalizedWorktreeBranch,
+      });
+
+      broadcastSessionMutation(userId, {
+        kind: 'created',
+        projectId: targetProjectId,
+        originClientId: getOriginClientIdFromRequest(req),
       });
 
       return NextResponse.json({

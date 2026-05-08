@@ -4,6 +4,8 @@ import logger from '@/lib/logger';
 import { archiveSession } from '@/lib/session/session-archive';
 import { pruneExpiredArchivedWorktrees, restoreArchivedChat } from '@/lib/archive/archive-service';
 import { SettingsManager } from '@/lib/settings/manager';
+import { getSession } from '@/lib/db/sessions';
+import { broadcastSessionMutation, getOriginClientIdFromRequest } from '@/lib/ws/mutation-broadcast';
 
 /**
  * PATCH /api/sessions/[id]/archive
@@ -61,6 +63,12 @@ export async function PATCH(
     }
 
     logger.info({ sessionId, archived }, 'Session archive status updated');
+
+    broadcastSessionMutation(auth.userId, {
+      kind: 'updated',
+      projectId: getSession(sessionId)?.project_id,
+      originClientId: getOriginClientIdFromRequest(req),
+    });
 
     return NextResponse.json(result);
   } catch (err) {
