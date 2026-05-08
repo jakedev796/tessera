@@ -15,6 +15,7 @@ interface SessionPrState {
     prUnsupported: boolean,
     remoteBranchExists: boolean | undefined,
   ) => void;
+  clearSession: (sessionId: string) => void;
 }
 
 export const useSessionPrStore = create<SessionPrState>((set) => ({
@@ -26,5 +27,12 @@ export const useSessionPrStore = create<SessionPrState>((set) => ({
         [sessionId]: { prStatus, prUnsupported, remoteBranchExists },
       },
     }));
+  },
+  clearSession: (sessionId) => {
+    set((state) => {
+      if (!(sessionId in state.prBySessionId)) return state;
+      const { [sessionId]: _removed, ...rest } = state.prBySessionId;
+      return { prBySessionId: rest };
+    });
   },
 }));

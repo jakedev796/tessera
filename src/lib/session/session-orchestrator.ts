@@ -24,6 +24,7 @@ import { getAgentEnvironment } from '../cli/spawn-cli';
 import { createGitRunner } from '../worktrees/git-runner';
 import { isManagedWorktreePath, removeManagedWorktree } from '../worktrees/managed';
 import { syncSingleSessionTaskTitleFromSession } from '../task-title-sync';
+import { clearCachedSessionPr } from '../github/session-pr-sync';
 
 const MAX_SESSIONS = 20;
 
@@ -173,6 +174,7 @@ export class SessionOrchestrator {
       await sessionHistory.deleteSession(sessionId);
 
       dbSessions.deleteSession(sessionId);
+      clearCachedSessionPr(sessionId);
 
       logger.info({ userId, sessionId }, 'Session deleted successfully');
     } catch (err) {

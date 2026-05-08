@@ -8,7 +8,7 @@ import {
 } from "@/lib/filesystem/path-environment";
 import * as dbSessions from "@/lib/db/sessions";
 import * as dbTasks from "@/lib/db/tasks";
-import { getCachedSessionPr } from "@/lib/github/session-pr-sync";
+import { getCachedSessionPr, syncSessionPr } from "@/lib/github/session-pr-sync";
 import { computeWorktreeFileDiffStats } from "@/lib/git/worktree-diff-stats";
 import { getCachedDiffStats } from "@/lib/git/worktree-diff-stats-cache";
 import { getAgentEnvironment, spawnCli } from "@/lib/cli/spawn-cli";
@@ -446,10 +446,20 @@ export async function getGitPanelData(
     : null;
   // Bare sessions (no task) carry PR state in an in-memory cache populated
   // by syncSessionPr — same probe pipeline as tasks, just keyed by sessionId
-  // since there's no task row to persist to.
-  const bareSessionPr = sessionContext.taskId
+  // since there's no task row to persist to. The cache is rebuilt on
+  // restart, so on the first panel load we probe inline to avoid the panel
+  // showing "no PR" until the next focus/poll tick.
+  let bareSessionPr = sessionContext.taskId
     ? null
     : getCachedSessionPr(sessionId) ?? null;
+  if (!sessionContext.taskId && !bareSessionPr && workDir) {
+    try {
+      await syncSessionPr(sessionId, { agentEnvironment });
+      bareSessionPr = getCachedSessionPr(sessionId) ?? null;
+    } catch {
+      // Best-effort — the visibility refresh and poller will fill it in.
+    }
+  }
 
   const [
     branchRaw,

@@ -57,6 +57,7 @@ export function handleIncomingServerMessage({
       chatStore.clearSession(msg.sessionId);
       useUsageStore.getState().clearUsage(msg.sessionId);
       useCommandStore.getState().clearSession(msg.sessionId);
+      useSessionPrStore.getState().clearSession(msg.sessionId);
       return { wasReconnect };
 
     case 'session_stopped':
