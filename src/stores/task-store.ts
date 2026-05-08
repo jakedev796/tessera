@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import type { TaskEntity, WorkflowStatus } from '@/types/task-entity';
 import { useSessionStore } from './session-store';
+import { fetchWithClientId } from '@/lib/api/fetch-with-client-id';
 
 interface LoadTasksOptions {
   setCurrent?: boolean;
@@ -266,7 +267,7 @@ export const useTaskStore = create<TaskState>((set, get) => ({
 
   createTask: async (params) => {
     try {
-      const res = await fetch('/api/tasks', {
+      const res = await fetchWithClientId('/api/tasks', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(params),
@@ -347,7 +348,7 @@ export const useTaskStore = create<TaskState>((set, get) => ({
     }
 
     try {
-      const res = await fetch(`/api/tasks/${id}`, {
+      const res = await fetchWithClientId(`/api/tasks/${id}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(patch),
@@ -424,7 +425,7 @@ export const useTaskStore = create<TaskState>((set, get) => ({
     }
 
     try {
-      const res = await fetch(`/api/tasks/${id}`, { method: 'DELETE' });
+      const res = await fetchWithClientId(`/api/tasks/${id}`, { method: 'DELETE' });
       if (!res.ok) {
         await useSessionStore.getState().loadProjects();
         if (projectId)
@@ -530,7 +531,7 @@ export const useTaskStore = create<TaskState>((set, get) => ({
       ),
     }));
 
-    fetch('/api/tasks/reorder', {
+    fetchWithClientId('/api/tasks/reorder', {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ orderedIds }),

@@ -16,6 +16,8 @@ import { useSessionStore } from '@/stores/session-store';
 import { useTabStore } from '@/stores/tab-store';
 import { useFolderBrowserStore } from '@/stores/folder-browser-store';
 import { useSessionCrud } from '@/hooks/use-session-crud';
+import { usePopoutActive } from '@/hooks/use-popout-active';
+import { ExternalLink } from 'lucide-react';
 
 interface LeftPanelProps {
   width: number;
@@ -29,6 +31,7 @@ export function LeftPanel({ width }: LeftPanelProps) {
   const viewMode = useBoardStore((state) => state.viewMode);
   const projects = useSessionStore((state) => state.projects);
   const { deleteProject } = useSessionCrud();
+  const { isActive: isPopoutActive, closePopouts } = usePopoutActive();
 
   const handleAddProject = openFolderBrowser;
 
@@ -58,8 +61,32 @@ export function LeftPanel({ width }: LeftPanelProps) {
       <ProjectStrip onAddProject={handleAddProject} onRemoveProject={setRemoveTarget} />
       <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
         <AppHeader />
-        <div className="min-h-0 flex-1 overflow-hidden">
+        <div className="min-h-0 flex-1 overflow-hidden relative">
           {viewMode === 'board' ? <KanbanBoard /> : <Sidebar />}
+          {viewMode === 'board' && isPopoutActive && (
+            <div
+              className="absolute inset-0 z-20 flex items-center justify-center bg-(--board-bg)/80 backdrop-blur-sm"
+              data-testid="board-popout-lock"
+            >
+              <div className="flex flex-col items-center gap-3 px-6 py-5 max-w-sm text-center rounded-lg border border-(--divider) bg-(--sidebar-bg) shadow-lg">
+                <ExternalLink className="w-6 h-6 text-(--text-muted)" />
+                <div className="text-[0.875rem] font-semibold text-(--text-primary)">
+                  Board open in another window
+                </div>
+                <div className="text-[0.8125rem] text-(--text-muted)">
+                  The board view is currently popped out. Close the pop-out window to use it here.
+                </div>
+                <button
+                  type="button"
+                  onClick={() => { void closePopouts(); }}
+                  className="mt-1 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-(--accent) text-white text-[0.8125rem] font-medium cursor-pointer hover:opacity-90 transition-opacity"
+                  data-testid="board-popout-close-btn"
+                >
+                  Close pop-out window
+                </button>
+              </div>
+            </div>
+          )}
         </div>
       </div>
       <FolderBrowserDialog

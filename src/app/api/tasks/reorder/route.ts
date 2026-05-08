@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { requireAuthenticatedUserId } from '@/lib/auth/api-auth';
-import { reorderTasks } from '@/lib/db/tasks';
+import { reorderTasks, getTask } from '@/lib/db/tasks';
+import { broadcastTaskMutation, getOriginClientIdFromRequest } from '@/lib/ws/mutation-broadcast';
 import logger from '@/lib/logger';
 
 /**
@@ -23,6 +24,15 @@ export async function PATCH(req: NextRequest) {
 
     reorderTasks(orderedIds);
     logger.info({ count: orderedIds.length }, 'Tasks reordered');
+
+    const projectId = getTask(orderedIds[0])?.projectId;
+    if (projectId) {
+      broadcastTaskMutation(auth.userId, {
+        kind: 'reordered',
+        projectId,
+        originClientId: getOriginClientIdFromRequest(req),
+      });
+    }
 
     return NextResponse.json({ success: true });
   } catch (error: unknown) {

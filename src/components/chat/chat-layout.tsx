@@ -374,6 +374,72 @@ export function ChatLayout() {
     [activeSessionId],
   );
 
+  // When the last popout board window closes, refresh tasks/collections in the
+  // main window so changes made in the popout become visible.
+  useEffect(function reloadBoardOnPopoutClose() {
+    if (typeof window === 'undefined') return;
+    const electronApi = (window as Window & {
+      electronAPI?: {
+        isElectron?: boolean;
+        onPopoutStateChanged?: (cb: (count: number) => void) => (() => void) | void;
+      };
+    }).electronAPI;
+    if (!electronApi?.isElectron || !electronApi.onPopoutStateChanged) return;
+
+    let prev = 0;
+    const cleanup = electronApi.onPopoutStateChanged(async (next) => {
+      const wasActive = prev > 0;
+      prev = next;
+      if (!wasActive || next !== 0) return;
+      try {
+        const { reloadBoardData } = await import('@/hooks/use-popout-active');
+        await reloadBoardData();
+      } catch (err) {
+        console.warn('[ChatLayout] popout reload failed:', err);
+      }
+    });
+    return () => {
+      if (typeof cleanup === 'function') cleanup();
+    };
+  }, []);
+
+  // Listen for session-open requests forwarded from popout board windows.
+  useEffect(function listenForPopoutOpenSession() {
+    if (typeof window === 'undefined') return;
+    const electronApi = (window as Window & {
+      electronAPI?: {
+        isElectron?: boolean;
+        onPopoutOpenSession?: (
+          cb: (payload: { sessionId: string; action: 'preview' | 'pin' }) => void
+        ) => (() => void) | void;
+      };
+    }).electronAPI;
+    if (!electronApi?.isElectron || !electronApi.onPopoutOpenSession) return;
+    const cleanup = electronApi.onPopoutOpenSession(({ sessionId, action }) => {
+      if (!sessionId) return;
+      const tabStore = useTabStore.getState();
+      const location = tabStore.findSessionLocation(sessionId);
+      if (action === 'pin') {
+        if (location) {
+          tabStore.setActiveTab(location.tabId);
+          usePanelStore.getState().setActivePanelId(location.panelId);
+          tabStore.pinTab(location.tabId);
+        } else {
+          tabStore.createTabWithSession(sessionId);
+        }
+      } else if (location) {
+        tabStore.setActiveTab(location.tabId);
+        usePanelStore.getState().setActivePanelId(location.panelId);
+      } else {
+        tabStore.openPreview(sessionId);
+      }
+      useSessionStore.getState().setActiveSession(sessionId);
+    });
+    return () => {
+      if (typeof cleanup === 'function') cleanup();
+    };
+  }, []);
+
   // BR-TOGGLE-005: 반응형 강제 collapsed (<1024px)
   useEffect(() => {
     const handleResize = () => {

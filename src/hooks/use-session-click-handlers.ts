@@ -10,6 +10,24 @@ import { useSessionNavigation } from '@/hooks/use-session-navigation';
 import { getSessionSelectionId } from '@/lib/constants/special-sessions';
 import type { UnifiedSession } from '@/types/chat';
 
+interface PopoutElectronApi {
+  isElectron?: boolean;
+  popoutOpenSession?: (sessionId: string, action?: 'preview' | 'pin') => void;
+}
+
+export function tryForwardClickToMainWindow(
+  sessionId: string,
+  action: 'preview' | 'pin' = 'preview'
+): boolean {
+  if (typeof window === 'undefined') return false;
+  const popoutFlag = (window as Window & { __TESSERA_POPOUT__?: boolean }).__TESSERA_POPOUT__;
+  if (!popoutFlag) return false;
+  const electronApi = (window as Window & { electronAPI?: PopoutElectronApi }).electronAPI;
+  if (!electronApi?.isElectron || !electronApi.popoutOpenSession) return false;
+  electronApi.popoutOpenSession(sessionId, action);
+  return true;
+}
+
 /**
  * useSessionClickHandlers
  *
@@ -81,6 +99,12 @@ export function useSessionClickHandlers(options?: {
         wsClient.sendMarkAsRead(session.id);
       }
 
+      // When inside the popout board window, forward to main window
+      // so the task opens there, then return without local navigation.
+      if (tryForwardClickToMainWindow(session.id, 'preview')) {
+        return;
+      }
+
       // 2. Cross-tab location search (BR-SIDEBAR-004: replaces isInAnotherPanel)
       const location = useTabStore.getState().findSessionLocation(session.id);
       const currentActiveTabId = useTabStore.getState().activeTabId;
@@ -109,6 +133,9 @@ export function useSessionClickHandlers(options?: {
   // Handle session double-click — always opens as pinned tab
   const handleSessionDoubleClick = useCallback(
     async (session: UnifiedSession): Promise<void> => {
+      if (tryForwardClickToMainWindow(session.id, 'pin')) {
+        return;
+      }
       const tabStore = useTabStore.getState();
       const location = tabStore.findSessionLocation(session.id);
       if (location) {

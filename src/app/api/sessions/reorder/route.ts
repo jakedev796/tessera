@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { requireAuthenticatedUserId } from '@/lib/auth/api-auth';
 import { reorderSessions, reorderSessionsByIds } from '@/lib/db/sessions';
+import { broadcastSessionMutation, getOriginClientIdFromRequest } from '@/lib/ws/mutation-broadcast';
 import logger from '@/lib/logger';
 
 /**
@@ -30,6 +31,12 @@ export async function PATCH(req: NextRequest) {
       reorderSessionsByIds(orderedIds);
       logger.info({ count: orderedIds.length }, 'Sessions reordered by IDs');
     }
+
+    broadcastSessionMutation(auth.userId, {
+      kind: 'reordered',
+      projectId: typeof projectId === 'string' ? projectId : undefined,
+      originClientId: getOriginClientIdFromRequest(req),
+    });
 
     return NextResponse.json({ success: true });
   } catch (error: unknown) {

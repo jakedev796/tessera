@@ -5,6 +5,7 @@ import { validateEncodedPath } from '@/lib/validation/path';
 import * as dbProjects from '@/lib/db/projects';
 import * as dbSessions from '@/lib/db/sessions';
 import { getCachedOrScheduleBulk } from '@/lib/git/worktree-diff-stats-bulk';
+import { broadcastSessionMutation, getOriginClientIdFromRequest } from '@/lib/ws/mutation-broadcast';
 import logger from '@/lib/logger';
 
 /**
@@ -139,6 +140,12 @@ export async function DELETE(
     dbProjects.removeProject(encodedDir);
 
     logger.info({ userId, encodedDir }, 'Project removed from sidebar');
+
+    broadcastSessionMutation(userId, {
+      kind: 'project_deleted',
+      projectId: encodedDir,
+      originClientId: getOriginClientIdFromRequest(req),
+    });
 
     return NextResponse.json({ success: true });
   } catch (error: any) {

@@ -17,6 +17,7 @@ import { getProviderSessionRuntimeConfig } from '@/lib/settings/provider-default
 import { toast } from '@/stores/notification-store';
 import { useI18n } from '@/lib/i18n';
 import { captureTelemetryEvent } from '@/lib/telemetry/client';
+import { fetchWithClientId } from '@/lib/api/fetch-with-client-id';
 import type { UnifiedSession } from '@/types/chat';
 
 interface SessionCreateOptions {
@@ -41,7 +42,7 @@ export function useSessionCrud() {
   const [isGeneratingTitle, setIsGeneratingTitle] = useState(false);
 
   const requestSessionDelete = useCallback((sessionId: string) => {
-    return fetch(`/api/sessions/${sessionId}`, { method: 'DELETE' });
+    return fetchWithClientId(`/api/sessions/${sessionId}`, { method: 'DELETE' });
   }, []);
 
   const removeSessionFromStores = useCallback(
@@ -147,7 +148,7 @@ export function useSessionCrud() {
       try {
         const settings = useSettingsStore.getState().settings;
         const runtimeConfig = getProviderSessionRuntimeConfig(settings, resolvedProviderId);
-        const response = await fetch('/api/sessions', {
+        const response = await fetchWithClientId('/api/sessions', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -313,7 +314,7 @@ export function useSessionCrud() {
   const deleteProject = useCallback(
     async (encodedDir: string): Promise<void> => {
       try {
-        const response = await fetch(`/api/sessions/projects/${encodeURIComponent(encodedDir)}`, {
+        const response = await fetchWithClientId(`/api/sessions/projects/${encodeURIComponent(encodedDir)}`, {
           method: 'DELETE',
         });
 
@@ -348,7 +349,7 @@ export function useSessionCrud() {
       setIsRenaming(true);
 
       try {
-        const response = await fetch(`/api/sessions/${sessionId}/rename`, {
+        const response = await fetchWithClientId(`/api/sessions/${sessionId}/rename`, {
           method: 'PATCH',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ title: newTitle }),
@@ -406,7 +407,7 @@ export function useSessionCrud() {
       useSessionStore.getState().setGeneratingTitle(sessionId, true);
 
       try {
-        const response = await fetch(`/api/sessions/${sessionId}/generate-title`, {
+        const response = await fetchWithClientId(`/api/sessions/${sessionId}/generate-title`, {
           method: 'POST',
         });
 

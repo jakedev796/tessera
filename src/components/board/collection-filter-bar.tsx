@@ -1,11 +1,30 @@
 'use client';
 
 import { memo, useCallback, useEffect, useRef, useState } from 'react';
-import { Tag } from 'lucide-react';
+import { Tag, ExternalLink } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Tooltip } from '@/components/ui/tooltip';
 import { useI18n } from '@/lib/i18n';
+import { useBoardStore } from '@/stores/board-store';
 import type { Collection } from '@/types/collection';
+
+interface ElectronApiBoardPopout {
+  isElectron?: boolean;
+  openBoardWindow?: (payload?: {
+    projectDir?: string | null;
+    collectionFilter?: string | null;
+  }) => Promise<unknown>;
+}
+
+function getBoardPopoutApi(): ElectronApiBoardPopout | undefined {
+  if (typeof window === 'undefined') return undefined;
+  return (window as Window & { electronAPI?: ElectronApiBoardPopout }).electronAPI;
+}
+
+function isPopoutWindow(): boolean {
+  if (typeof window === 'undefined') return false;
+  return Boolean((window as Window & { __TESSERA_POPOUT__?: boolean }).__TESSERA_POPOUT__);
+}
 
 interface CollectionFilterBarProps {
   collections: Collection[];
@@ -99,9 +118,20 @@ export const CollectionFilterBar = memo(function CollectionFilterBar({
     </div>
   );
 
+  const electronApi = getBoardPopoutApi();
+  const canPopout = Boolean(electronApi?.isElectron && electronApi.openBoardWindow) && !isPopoutWindow();
+
+  const handlePopout = useCallback(() => {
+    const { selectedProjectDir, activeCollectionFilter } = useBoardStore.getState();
+    void electronApi?.openBoardWindow?.({
+      projectDir: selectedProjectDir,
+      collectionFilter: activeCollectionFilter,
+    });
+  }, [electronApi]);
+
   return (
     <div
-      className="flex min-w-0 shrink-0 items-center bg-(--board-bg) px-3 py-2"
+      className="flex min-w-0 shrink-0 items-center gap-2 bg-(--board-bg) px-3 py-2"
       data-testid="collection-filter-bar"
     >
       {isChipScrollerOverflowing ? (
@@ -113,6 +143,22 @@ export const CollectionFilterBar = memo(function CollectionFilterBar({
           {chipScroller}
         </Tooltip>
       ) : chipScroller}
+      {canPopout && (
+        <Tooltip content="Open board in new window" delay={350}>
+          <button
+            type="button"
+            onClick={handlePopout}
+            className={cn(
+              'shrink-0 rounded p-1.5 text-(--text-muted) transition-colors',
+              'hover:bg-(--sidebar-hover) hover:text-(--text-primary) cursor-pointer',
+            )}
+            aria-label="Open board in new window"
+            data-testid="board-popout-button"
+          >
+            <ExternalLink className="w-4 h-4" />
+          </button>
+        </Tooltip>
+      )}
     </div>
   );
 });

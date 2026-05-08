@@ -12,7 +12,10 @@ import { useSettingsStore } from '@/stores/settings-store';
 import { getProviderSessionRuntimeConfig } from '@/lib/settings/provider-defaults';
 import { captureTelemetryEvent } from '@/lib/telemetry/client';
 import { useSessionCrud } from '@/hooks/use-session-crud';
-import { useSessionClickHandlers } from '@/hooks/use-session-click-handlers';
+import {
+  useSessionClickHandlers,
+  tryForwardClickToMainWindow,
+} from '@/hooks/use-session-click-handlers';
 import { setKanbanChatDragData } from '@/lib/dnd/panel-session-drag';
 import { WORKFLOW_STATUS_ORDER } from '@/types/task-entity';
 import type { WorkflowStatus, TaskEntity } from '@/types/task-entity';
@@ -27,6 +30,7 @@ import { DeleteSessionDialog } from '@/components/chat/delete-session-dialog';
 import { DeleteTaskDialog } from '@/components/chat/delete-task-dialog';
 import { MoveProjectDialog } from '@/components/chat/move-project-dialog';
 import { wsClient } from '@/lib/ws/client';
+import { fetchWithClientId } from '@/lib/api/fetch-with-client-id';
 import {
   getKanbanScrollPosition,
   getKanbanScrollPositionKey,
@@ -80,6 +84,9 @@ export const KanbanBoard = memo(function KanbanBoard() {
   // Collection store
   const collections = useCollectionStore((s) =>
     selectedProjectDir ? s.collectionsByProject[selectedProjectDir] ?? EMPTY_COLLECTIONS : EMPTY_COLLECTIONS
+  );
+  const collectionsLoadedForProject = useCollectionStore((s) =>
+    selectedProjectDir ? Boolean(s.loadedProjects[selectedProjectDir]) : false
   );
 
   // Task store
@@ -323,9 +330,13 @@ export const KanbanBoard = memo(function KanbanBoard() {
 
   useEffect(() => {
     if (!activeCollectionFilter) return;
+    // Don't clear the filter while collections are still loading -- otherwise a
+    // popout opened with a hydrated filter would see an empty collection list
+    // and reset itself before loadCollections() resolves.
+    if (!collectionsLoadedForProject) return;
     if (collections.some((collection) => collection.id === activeCollectionFilter)) return;
     setCollectionFilter(null);
-  }, [activeCollectionFilter, collections, setCollectionFilter]);
+  }, [activeCollectionFilter, collections, collectionsLoadedForProject, setCollectionFilter]);
 
   const selectedProject = useMemo(() => {
     return projects.find((project) => project.encodedDir === selectedProjectDir) ?? null;
@@ -547,6 +558,7 @@ export const KanbanBoard = memo(function KanbanBoard() {
   }, [renameSession]);
 
   const handleCardOpenInNewTab = useCallback(async (taskId: string) => {
+    if (tryForwardClickToMainWindow(taskId, 'pin')) return;
     useTabStore.getState().createTabWithSession(taskId);
   }, []);
 
@@ -601,7 +613,7 @@ export const KanbanBoard = memo(function KanbanBoard() {
       }
       const runtimeConfig = getProviderSessionRuntimeConfig(settings, providerId);
 
-      const res = await fetch('/api/sessions', {
+      const res = await fetchWithClientId('/api/sessions', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -710,7 +722,9 @@ export const KanbanBoard = memo(function KanbanBoard() {
     if (!taskMenuAnchor) return;
     const primarySession = taskMenuAnchor.task.sessions[0];
     if (primarySession) {
-      useTabStore.getState().createTabWithSession(primarySession.id);
+      if (!tryForwardClickToMainWindow(primarySession.id, 'pin')) {
+        useTabStore.getState().createTabWithSession(primarySession.id);
+      }
     }
     setTaskMenuAnchor(null);
   }, [taskMenuAnchor]);

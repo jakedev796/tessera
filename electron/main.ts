@@ -266,6 +266,7 @@ if (process.env.TESSERA_DISABLE_GPU === '1') {
 }
 
 let mainWindow: BrowserWindow | null = null;
+const popoutWindows = new Set<BrowserWindow>();
 let serverProcess: ChildProcess | null = null;
 let serverPort = 0;
 let isQuitting = false;
@@ -642,8 +643,113 @@ function createWindow(port: number): BrowserWindow {
   return win;
 }
 
+// ── Popout window ──────────────────────────────────────────────────────────
+function createPopoutWindow(port: number, route: string): BrowserWindow {
+  const isWindows = process.platform === 'win32';
+  const isMac = process.platform === 'darwin';
+  const initialTitlebarTheme: TitlebarTheme = nativeTheme.shouldUseDarkColors ? 'dark' : 'light';
+
+  const win = new BrowserWindow({
+    width: 1200,
+    height: 800,
+    minWidth: 600,
+    minHeight: 400,
+    title: 'Tessera Board',
+    show: false,
+    icon: path.join(__dirname, '..', 'assets', 'icon.png'),
+    webPreferences: {
+      preload: path.join(__dirname, 'preload.js'),
+      contextIsolation: true,
+      nodeIntegration: false,
+      webSecurity: true,
+    },
+    autoHideMenuBar: !isMac,
+    backgroundColor: isWindows ? WINDOWS_TITLEBAR_THEME[initialTitlebarTheme].color : undefined,
+    titleBarStyle: isMac ? 'hiddenInset' : isWindows ? 'hidden' : 'default',
+    titleBarOverlay: isWindows ? getTitlebarOverlayOptions(initialTitlebarTheme) : false,
+  });
+
+  if (!isMac) {
+    win.removeMenu();
+  }
+
+  const url = `http://localhost:${port}${route}`;
+  win.loadURL(url);
+
+  win.once('ready-to-show', () => win.show());
+
+  win.webContents.setWindowOpenHandler(({ url: openUrl }) => {
+    if (openUrl.startsWith('https://') || openUrl.startsWith('http://')) {
+      shell.openExternal(openUrl);
+    }
+    return { action: 'deny' };
+  });
+
+  win.webContents.on('context-menu', (_event, params) => {
+    const template = buildWebContentsContextMenuTemplate(params);
+    if (template.length === 0) return;
+    const menu = Menu.buildFromTemplate(template);
+    menu.popup({ window: win, x: params.x, y: params.y });
+  });
+
+  popoutWindows.add(win);
+  broadcastPopoutState();
+  win.on('closed', () => {
+    popoutWindows.delete(win);
+    broadcastPopoutState();
+  });
+
+  return win;
+}
+
+function broadcastPopoutState(): void {
+  if (!mainWindow || mainWindow.isDestroyed()) return;
+  mainWindow.webContents.send('popout-state-changed', { count: popoutWindows.size });
+}
+
 // ── IPC ────────────────────────────────────────────────────────────────────
 ipcMain.handle('get-server-port', () => serverPort);
+ipcMain.handle('open-board-window', (_event, payload?: unknown) => {
+  if (!serverPort) return { ok: false };
+  const params = new URLSearchParams();
+  if (payload && typeof payload === 'object') {
+    const { projectDir, collectionFilter } = payload as {
+      projectDir?: unknown;
+      collectionFilter?: unknown;
+    };
+    if (typeof projectDir === 'string' && projectDir.length > 0) {
+      params.set('projectDir', projectDir);
+    }
+    if (typeof collectionFilter === 'string' && collectionFilter.length > 0) {
+      params.set('collectionFilter', collectionFilter);
+    }
+  }
+  const query = params.toString();
+  const route = query ? `/board-popout?${query}` : '/board-popout';
+  const win = createPopoutWindow(serverPort, route);
+  return { ok: true, windowId: win.id };
+});
+ipcMain.handle('close-board-popouts', () => {
+  for (const win of Array.from(popoutWindows)) {
+    if (!win.isDestroyed()) win.close();
+  }
+  return { ok: true };
+});
+ipcMain.handle('get-popout-state', () => ({ count: popoutWindows.size }));
+ipcMain.on('popout-open-session', (_event, payload: unknown) => {
+  if (!payload || typeof payload !== 'object') return;
+  const { sessionId, action } = payload as { sessionId?: unknown; action?: unknown };
+  if (typeof sessionId !== 'string' || !sessionId) return;
+  const resolvedAction: 'preview' | 'pin' = action === 'pin' ? 'pin' : 'preview';
+  if (!mainWindow || mainWindow.isDestroyed()) return;
+  if (mainWindow.isMinimized()) mainWindow.restore();
+  if (!mainWindow.isVisible()) mainWindow.show();
+  mainWindow.focus();
+  mainWindow.webContents.send('popout-open-session', {
+    sessionId,
+    action: resolvedAction,
+  });
+});
 ipcMain.on(
   'window-close-response',
   (

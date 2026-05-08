@@ -26,6 +26,39 @@ contextBridge.exposeInMainWorld('electronAPI', {
     section: 'file' | 'edit' | 'view' | 'window' | 'help',
     anchor: { x: number; y: number }
   ) => ipcRenderer.invoke('titlebar-popup-menu', section, anchor),
+  openBoardWindow: (payload?: { projectDir?: string | null; collectionFilter?: string | null }) =>
+    ipcRenderer.invoke('open-board-window', payload),
+  closeBoardPopouts: () => ipcRenderer.invoke('close-board-popouts'),
+  getPopoutState: () => ipcRenderer.invoke('get-popout-state'),
+  onPopoutStateChanged: (callback: (count: number) => void) => {
+    const listener = (_event: Electron.IpcRendererEvent, payload: { count?: number }) => {
+      if (typeof payload?.count === 'number') {
+        callback(payload.count);
+      }
+    };
+    ipcRenderer.on('popout-state-changed', listener);
+    return () => {
+      ipcRenderer.removeListener('popout-state-changed', listener);
+    };
+  },
+  popoutOpenSession: (sessionId: string, action: 'preview' | 'pin' = 'preview') =>
+    ipcRenderer.send('popout-open-session', { sessionId, action }),
+  onPopoutOpenSession: (
+    callback: (payload: { sessionId: string; action: 'preview' | 'pin' }) => void
+  ) => {
+    const listener = (
+      _event: Electron.IpcRendererEvent,
+      payload: { sessionId?: string; action?: string }
+    ) => {
+      if (typeof payload?.sessionId !== 'string') return;
+      const action: 'preview' | 'pin' = payload.action === 'pin' ? 'pin' : 'preview';
+      callback({ sessionId: payload.sessionId, action });
+    };
+    ipcRenderer.on('popout-open-session', listener);
+    return () => {
+      ipcRenderer.removeListener('popout-open-session', listener);
+    };
+  },
   onTitlebarMenuCommand: (callback: (command: string) => void) => {
     const listener = (_event: Electron.IpcRendererEvent, payload: { command?: string }) => {
       if (typeof payload?.command === 'string') {

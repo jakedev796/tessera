@@ -2,9 +2,12 @@ import { create } from 'zustand';
 import type { Collection } from '@/types/collection';
 import { useSessionStore } from './session-store';
 import { useTaskStore } from './task-store';
+import { fetchWithClientId } from '@/lib/api/fetch-with-client-id';
 
 interface LoadCollectionsOptions {
   setCurrent?: boolean;
+  /** Bypass the per-project loaded cache and refetch from the API. */
+  force?: boolean;
 }
 
 interface CollectionState {
@@ -108,9 +111,10 @@ export const useCollectionStore = create<CollectionState>((set, get) => ({
 
   loadCollections: async (projectId, options) => {
     const shouldSetCurrent = options?.setCurrent !== false;
+    const force = options?.force === true;
     const currentState = get();
 
-    if (currentState.loadedProjects[projectId]) {
+    if (!force && currentState.loadedProjects[projectId]) {
       if (shouldSetCurrent) {
         set({
           collections: currentState.collectionsByProject[projectId] ?? [],
@@ -170,7 +174,7 @@ export const useCollectionStore = create<CollectionState>((set, get) => ({
 
   addCollection: async (projectId, label, color) => {
     try {
-      const res = await fetch('/api/collections', {
+      const res = await fetchWithClientId('/api/collections', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ projectId, label, color }),
@@ -218,7 +222,7 @@ export const useCollectionStore = create<CollectionState>((set, get) => ({
     }));
 
     try {
-      const res = await fetch(`/api/collections/${id}`, {
+      const res = await fetchWithClientId(`/api/collections/${id}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ label, color }),
@@ -268,7 +272,7 @@ export const useCollectionStore = create<CollectionState>((set, get) => ({
     }));
 
     try {
-      const res = await fetch(`/api/collections/${id}`, { method: 'DELETE' });
+      const res = await fetchWithClientId(`/api/collections/${id}`, { method: 'DELETE' });
       if (!res.ok) {
         set((currentState) => ({
           ...updateProjectCache(

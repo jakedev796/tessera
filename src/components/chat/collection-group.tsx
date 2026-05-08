@@ -10,6 +10,7 @@ import {
   getPrioritizedCollectionIndicatorStatus,
 } from '@/lib/chat/collection-status-indicator';
 import { getProviderSessionRuntimeConfig } from '@/lib/settings/provider-defaults';
+import { fetchWithClientId } from '@/lib/api/fetch-with-client-id';
 import { useBoardStore } from '@/stores/board-store';
 import {
   selectAnyAwaitingUserPrompt,
@@ -54,7 +55,7 @@ async function addSessionToTask(task: TaskEntity, requestedProviderId?: string) 
     }
     const runtimeConfig = getProviderSessionRuntimeConfig(settings, providerId);
 
-    const sessionResponse = await fetch('/api/sessions', {
+    const sessionResponse = await fetchWithClientId('/api/sessions', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({

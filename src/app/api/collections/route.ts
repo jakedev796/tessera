@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { requireAuthenticatedUserId } from '@/lib/auth/api-auth';
 import * as dbCollections from '@/lib/db/collections';
 import { generateCollectionId } from '@/types/collection';
+import { broadcastCollectionMutation, getOriginClientIdFromRequest } from '@/lib/ws/mutation-broadcast';
 import logger from '@/lib/logger';
 
 /**
@@ -73,6 +74,11 @@ export async function POST(req: NextRequest) {
       sortOrder
     );
     logger.info({ id, projectId: normalizedProjectId, label: label.trim() }, 'Collection created');
+    broadcastCollectionMutation(auth.userId, {
+      kind: 'created',
+      projectId: normalizedProjectId,
+      originClientId: getOriginClientIdFromRequest(req),
+    });
     return NextResponse.json({ collection }, { status: 201 });
   } catch (err: unknown) {
     logger.error({ error: err }, 'Failed to create collection');

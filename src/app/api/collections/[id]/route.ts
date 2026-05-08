@@ -2,6 +2,11 @@ import { NextRequest, NextResponse } from 'next/server';
 import { requireAuthenticatedUserId } from '@/lib/auth/api-auth';
 import * as dbCollections from '@/lib/db/collections';
 import { isCollection } from '@/types/collection';
+import {
+  broadcastCollectionMutation,
+  broadcastSessionMutation,
+  getOriginClientIdFromRequest,
+} from '@/lib/ws/mutation-broadcast';
 import logger from '@/lib/logger';
 
 /**
@@ -66,6 +71,14 @@ export async function PATCH(
   try {
     dbCollections.updateCollection(id, patch);
     logger.info({ id, ...patch }, 'Collection updated');
+    const projectId = dbCollections.getCollectionProjectId(id);
+    if (projectId) {
+      broadcastCollectionMutation(auth.userId, {
+        kind: 'updated',
+        projectId,
+        originClientId: getOriginClientIdFromRequest(req),
+      });
+    }
     return NextResponse.json({ ok: true });
   } catch (err: unknown) {
     logger.error({ id, error: err }, 'Failed to update collection');
@@ -95,8 +108,22 @@ export async function DELETE(
   }
 
   try {
+    const projectId = dbCollections.getCollectionProjectId(id);
     const { movedCount } = dbCollections.deleteCollection(id);
     logger.info({ id, movedCount }, 'Collection deleted');
+    if (projectId) {
+      const originClientId = getOriginClientIdFromRequest(req);
+      broadcastCollectionMutation(auth.userId, {
+        kind: 'deleted',
+        projectId,
+        originClientId,
+      });
+      broadcastSessionMutation(auth.userId, {
+        kind: 'updated',
+        projectId,
+        originClientId,
+      });
+    }
     return NextResponse.json({ ok: true, movedCount });
   } catch (err: unknown) {
     logger.error({ id, error: err }, 'Failed to delete collection');

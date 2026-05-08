@@ -9,6 +9,7 @@ import { useSelectionStore } from '@/stores/selection-store';
 import { useCollectionStore } from '@/stores/collection-store';
 import { COLLECTION_ITEM_DND_MIME, COLLECTION_GROUP_DND_MIME, TASK_MULTI_DND_MIME } from '@/types/task';
 import { setPanelSessionDragData } from '@/lib/dnd/panel-session-drag';
+import { fetchWithClientId } from '@/lib/api/fetch-with-client-id';
 
 /**
  * useCollectionDnd
@@ -532,7 +533,7 @@ export function useCollectionDnd(): UseCollectionDndReturn {
       );
       // Persist (fire-and-forget — server reorders)
       for (const u of updates) {
-        fetch(`/api/collections/${u.id}`, {
+        fetchWithClientId(`/api/collections/${u.id}`, {
           method: 'PATCH',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ sortOrder: u.sortOrder }),

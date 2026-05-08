@@ -329,6 +329,24 @@ export type AppServerMessage =
       type: 'git_panel_state';
       sessionId: string;
       data: import('@/types/git').GitPanelData;
+    }
+  | {
+      type: 'session_mutated';
+      kind: 'created' | 'updated' | 'deleted' | 'reordered' | 'project_reordered' | 'project_deleted';
+      originClientId?: string;
+      projectId?: string;
+    }
+  | {
+      type: 'task_mutated';
+      kind: 'created' | 'updated' | 'deleted' | 'reordered';
+      originClientId?: string;
+      projectId: string;
+    }
+  | {
+      type: 'collection_mutated';
+      kind: 'created' | 'updated' | 'deleted';
+      originClientId?: string;
+      projectId: string;
     };
 
 /**

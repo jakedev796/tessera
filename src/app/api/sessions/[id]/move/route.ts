@@ -3,6 +3,7 @@ import { requireAuthenticatedUserId } from '@/lib/auth/api-auth';
 import * as dbSessions from '@/lib/db/sessions';
 import * as dbProjects from '@/lib/db/projects';
 import { processManager } from '@/lib/cli/process-manager';
+import { broadcastSessionMutation, getOriginClientIdFromRequest } from '@/lib/ws/mutation-broadcast';
 import logger from '@/lib/logger';
 
 /**
@@ -93,6 +94,11 @@ export async function PATCH(
       sessionId,
       from: session.project_id,
       to: targetProjectId,
+    });
+
+    broadcastSessionMutation(auth.userId, {
+      kind: 'updated',
+      originClientId: getOriginClientIdFromRequest(req),
     });
 
     return NextResponse.json({

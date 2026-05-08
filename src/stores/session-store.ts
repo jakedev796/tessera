@@ -6,6 +6,7 @@ import { useTaskStore } from './task-store';
 import { toast } from './notification-store';
 import { wsClient } from '@/lib/ws/client';
 import { captureTelemetryEvent } from '@/lib/telemetry/client';
+import { fetchWithClientId } from '@/lib/api/fetch-with-client-id';
 
 
 interface SessionState {
@@ -832,7 +833,7 @@ export const useSessionStore = create<SessionState>((set, get) => ({
     }));
 
     // Server sync with rollback
-    fetch(`/api/sessions/${sessionId}/collection`, {
+    fetchWithClientId(`/api/sessions/${sessionId}/collection`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ collectionId }),
@@ -906,7 +907,7 @@ export const useSessionStore = create<SessionState>((set, get) => ({
       })),
     }));
 
-    fetch(`/api/sessions/${sessionId}/archive`, {
+    fetchWithClientId(`/api/sessions/${sessionId}/archive`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ archived }),
@@ -1003,7 +1004,7 @@ export const useSessionStore = create<SessionState>((set, get) => ({
     }));
 
     // Server sync with rollback
-    fetch(`/api/sessions/${sessionId}/move`, {
+    fetchWithClientId(`/api/sessions/${sessionId}/move`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ targetProjectId }),
@@ -1069,7 +1070,7 @@ export const useSessionStore = create<SessionState>((set, get) => ({
 
     // Persist to server
     const orderedIds = projects.map((p) => p.encodedDir);
-    fetch('/api/sessions/projects/reorder', {
+    fetchWithClientId('/api/sessions/projects/reorder', {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ orderedIds }),
@@ -1098,7 +1099,7 @@ export const useSessionStore = create<SessionState>((set, get) => ({
     }));
 
     // Persist to server
-    fetch('/api/sessions/reorder', {
+    fetchWithClientId('/api/sessions/reorder', {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ projectId: projectDir, orderedIds }),
@@ -1120,7 +1121,7 @@ export const useSessionStore = create<SessionState>((set, get) => ({
         ),
       })),
     }));
-    fetch('/api/sessions/reorder', {
+    fetchWithClientId('/api/sessions/reorder', {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ orderedIds }),

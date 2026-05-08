@@ -3,6 +3,7 @@ import { requireAuthenticatedUserId } from '@/lib/auth/api-auth';
 import { getSession, updateSession } from '@/lib/db/sessions';
 import { collectionExists } from '@/lib/db/collections';
 import { updateTask } from '@/lib/db/tasks';
+import { broadcastSessionMutation, getOriginClientIdFromRequest } from '@/lib/ws/mutation-broadcast';
 import logger from '@/lib/logger';
 
 /**
@@ -57,6 +58,11 @@ export async function PATCH(
       });
       logger.info({ sessionId: id, collectionId: collectionId ?? null }, 'Session collection updated');
     }
+    broadcastSessionMutation(auth.userId, {
+      kind: 'updated',
+      projectId: session.project_id,
+      originClientId: getOriginClientIdFromRequest(req),
+    });
     return NextResponse.json({ ok: true });
   } catch (err: unknown) {
     logger.error({ sessionId: id, error: err }, 'Failed to update session collection');

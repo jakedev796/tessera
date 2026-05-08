@@ -20,6 +20,7 @@ import {
 import { useArchiveConfirm } from '@/hooks/use-archive-confirm';
 import { useInlineRename } from '@/hooks/use-inline-rename';
 import { setPanelSessionDragData } from '@/lib/dnd/panel-session-drag';
+import { fetchWithClientId } from '@/lib/api/fetch-with-client-id';
 import { cn } from '@/lib/utils';
 import { useI18n } from '@/lib/i18n';
 import { useBoardStore } from '@/stores/board-store';
@@ -296,7 +297,7 @@ export function CollectionContextMenu({
     async (collectionId: string | null) => {
       onClose();
       if (menu.type === 'chat') {
-        await fetch(`/api/sessions/${menu.targetId}/collection`, {
+        await fetchWithClientId(`/api/sessions/${menu.targetId}/collection`, {
           method: 'PATCH',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ collectionId }),

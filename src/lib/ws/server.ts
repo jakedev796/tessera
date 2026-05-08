@@ -405,5 +405,8 @@ export class WebSocketServer {
   }
 }
 
-// Singleton instance
-export const wsServer = new WebSocketServer();
+// Singleton instance (globalThis to survive Next.js hot reload and webpack/tsx module boundary)
+const WS_SERVER_KEY = Symbol.for('tessera.wsServer');
+const _wsServerGlobal = globalThis as unknown as Record<symbol, WebSocketServer>;
+export const wsServer: WebSocketServer =
+  _wsServerGlobal[WS_SERVER_KEY] || (_wsServerGlobal[WS_SERVER_KEY] = new WebSocketServer());
