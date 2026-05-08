@@ -112,7 +112,7 @@ export function syncSessionPr(
 
       const branch = await resolveCurrentBranch(session.work_dir, options.agentEnvironment);
       if (!branch) {
-        applyAndNotify(sessionId, { prUnsupported: true });
+        markUnsupportedIfChanged(sessionId);
         return;
       }
 
@@ -123,7 +123,7 @@ export function syncSessionPr(
       });
 
       if (probe.kind === 'unsupported') {
-        applyAndNotify(sessionId, { prUnsupported: true });
+        markUnsupportedIfChanged(sessionId);
         return;
       }
 
@@ -167,6 +167,17 @@ function applyAndNotify(sessionId: string, payload: Omit<SessionPrUpdate, 'sessi
     lastSyncedAt: Date.now(),
   });
   notify({ sessionId, ...payload });
+}
+
+function markUnsupportedIfChanged(sessionId: string): void {
+  const previous = getState().cache.get(sessionId);
+  if (previous?.prUnsupported === true) {
+    // Cache already reflects unsupported state — skip broadcast so the
+    // 60s poll doesn't spam clients with no-op messages for non-GitHub
+    // repos, missing branches, or unauthenticated gh.
+    return;
+  }
+  applyAndNotify(sessionId, { prUnsupported: true });
 }
 
 /**
