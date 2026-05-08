@@ -8,6 +8,7 @@ import {
 } from "@/lib/filesystem/path-environment";
 import * as dbSessions from "@/lib/db/sessions";
 import * as dbTasks from "@/lib/db/tasks";
+import { getCachedSessionPr } from "@/lib/github/session-pr-sync";
 import { computeWorktreeFileDiffStats } from "@/lib/git/worktree-diff-stats";
 import { getCachedDiffStats } from "@/lib/git/worktree-diff-stats-cache";
 import { getAgentEnvironment, spawnCli } from "@/lib/cli/spawn-cli";
@@ -302,7 +303,7 @@ export function summarizeStatusCheckRollup(items: unknown[]): GitChecksSummary {
 async function resolveGitHubPanelState(
   workDir: string,
   remoteUrl: string | null,
-  prContext: dbTasks.TaskPrSyncContext | null,
+  prSummary: { wasUnsupported: boolean; prStatus?: unknown } | null,
   agentEnvironment: AgentEnvironment,
 ): Promise<GitPanelData["github"]> {
   if (!normalizeGithubUrl(remoteUrl)) {
@@ -336,19 +337,19 @@ async function resolveGitHubPanelState(
     };
   }
 
-  if (prContext?.wasUnsupported) {
+  if (prSummary?.wasUnsupported) {
     return {
       available: false,
       reasonCode: "unknown",
-      reason: "GitHub PR sync is unavailable for this task.",
+      reason: "GitHub PR sync is unavailable for this session.",
       pullRequest: null,
     };
   }
 
   return {
     available: true,
-    reasonCode: prContext?.prStatus ? null : "no_pull_request",
-    reason: prContext?.prStatus
+    reasonCode: prSummary?.prStatus ? null : "no_pull_request",
+    reason: prSummary?.prStatus
       ? null
       : "No pull request is linked to the current branch.",
     pullRequest: null,
@@ -443,6 +444,12 @@ export async function getGitPanelData(
   const prContext = sessionContext.taskId
     ? dbTasks.getTaskPrSyncContext(sessionContext.taskId)
     : null;
+  // Bare sessions (no task) carry PR state in an in-memory cache populated
+  // by syncSessionPr — same probe pipeline as tasks, just keyed by sessionId
+  // since there's no task row to persist to.
+  const bareSessionPr = sessionContext.taskId
+    ? null
+    : getCachedSessionPr(sessionId) ?? null;
 
   const [
     branchRaw,
@@ -494,7 +501,12 @@ export async function getGitPanelData(
     runOptionalCommand("git", ["rev-parse", "HEAD"], workDir, agentEnvironment),
   ]);
   const { ahead, behind } = parseAheadBehind(aheadBehindRaw);
-  const github = await resolveGitHubPanelState(workDir, remoteUrl, prContext, agentEnvironment);
+  const prSummary = prContext
+    ? { wasUnsupported: prContext.wasUnsupported, prStatus: prContext.prStatus }
+    : bareSessionPr
+      ? { wasUnsupported: bareSessionPr.prUnsupported, prStatus: bareSessionPr.prStatus }
+      : null;
+  const github = await resolveGitHubPanelState(workDir, remoteUrl, prSummary, agentEnvironment);
 
   return {
     sessionId,
@@ -522,9 +534,11 @@ export async function getGitPanelData(
     diffStats: sessionContext.worktreeBranch
       ? getCachedDiffStats(workDir) ?? undefined
       : undefined,
-    prStatus: prContext?.prStatus,
-    prUnsupported: prContext?.wasUnsupported ?? false,
-    remoteBranchExists: prContext?.remoteBranchExists,
+    prStatus: prContext?.prStatus ?? bareSessionPr?.prStatus,
+    prUnsupported:
+      prContext?.wasUnsupported ?? bareSessionPr?.prUnsupported ?? false,
+    remoteBranchExists:
+      prContext?.remoteBranchExists ?? bareSessionPr?.remoteBranchExists,
     headSha: headShaRaw && /^[0-9a-f]{40}$/i.test(headShaRaw) ? headShaRaw : null,
   };
 }

@@ -6,6 +6,7 @@ import { isTurnInFlight, useChatStore } from "@/stores/chat-store";
 import { useGitPanelStore } from "@/stores/git-panel-store";
 import { useSettingsStore } from "@/stores/settings-store";
 import { useSessionStore } from "@/stores/session-store";
+import { useSessionPrStore } from "@/stores/session-pr-store";
 import { useTaskStore } from "@/stores/task-store";
 import type {
   GitChangedFilesData,
@@ -111,6 +112,9 @@ export function useGitPanelController(sessionId: string | null) {
   const liveTaskId = data?.taskId ?? taskSnapshot?.id;
   const livePrStatus = useTaskStore((state) =>
     liveTaskId ? state.prStatusByTaskId[liveTaskId] : undefined,
+  );
+  const liveSessionPr = useSessionPrStore((state) =>
+    !liveTaskId && sessionId ? state.prBySessionId[sessionId] : undefined,
   );
   const gitConfig = useSettingsStore((state) => state.settings.gitConfig);
 
@@ -267,7 +271,7 @@ export function useGitPanelController(sessionId: string | null) {
           prUnsupported: taskSnapshot.prUnsupported,
           remoteBranchExists: taskSnapshot.remoteBranchExists,
         }
-      : livePrStatus;
+      : (livePrStatus ?? liveSessionPr);
 
     return {
       ...data,
@@ -277,7 +281,7 @@ export function useGitPanelController(sessionId: string | null) {
       remoteBranchExists:
         livePr?.remoteBranchExists ?? data.remoteBranchExists,
     };
-  }, [data, livePrStatus, sessionSnapshot?.diffStats, taskSnapshot]);
+  }, [data, liveSessionPr, livePrStatus, sessionSnapshot?.diffStats, taskSnapshot]);
 
   const closeAction = useCallback(() => {
     setActiveAction(null);

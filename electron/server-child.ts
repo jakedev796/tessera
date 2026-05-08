@@ -14,6 +14,9 @@ import { processManager } from '../src/lib/cli/process-manager';
 import { getAgentEnvironment } from '../src/lib/cli/spawn-cli';
 import { getElectronAuthUserId } from '../src/lib/auth/electron-user';
 import { rateLimitPoller } from '../src/lib/rate-limit/poller';
+import { taskPrPoller } from '../src/lib/github/task-pr-poller';
+import { installTaskPrStatusBroadcast, uninstallTaskPrStatusBroadcast } from '../src/lib/github/task-pr-broadcast';
+import { installSessionPrStatusBroadcast, uninstallSessionPrStatusBroadcast } from '../src/lib/github/session-pr-broadcast';
 import { prewarmCliStatusSnapshot } from '../src/lib/cli/provider-status-prewarm';
 import { snapshotTelemetryStartupDataState } from '../src/lib/telemetry/server-state';
 import logger from '../src/lib/logger';
@@ -94,6 +97,13 @@ initDatabase().then(() => {
     });
     rateLimitPoller.start();
 
+    // Wire PR sync broadcasts and start the background PR poller. Without
+    // these the in-process subscribe callbacks on syncTaskPr/syncSessionPr
+    // have no listeners, so live updates never reach Electron clients.
+    installTaskPrStatusBroadcast((msg) => wsServer.broadcast(msg));
+    installSessionPrStatusBroadcast((msg) => wsServer.broadcast(msg));
+    void taskPrPoller.start();
+
     logger.info({ port, hostname, env: process.env.NODE_ENV }, 'Electron server started');
     console.log(`> Ready on http://${hostname}:${port}`);
     console.log(`> WebSocket on ws://${hostname}:${port}/ws`);
@@ -123,6 +133,11 @@ initDatabase().then(() => {
 
       logger.info('Stopping rate limit poller...');
       rateLimitPoller.stop();
+
+      logger.info('Stopping task PR poller...');
+      taskPrPoller.stop();
+      uninstallTaskPrStatusBroadcast();
+      uninstallSessionPrStatusBroadcast();
 
       logger.info('Cleaning up CLI processes...');
       await processManager.cleanup();

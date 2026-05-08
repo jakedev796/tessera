@@ -2,6 +2,7 @@ import * as dbSessions from '@/lib/db/sessions';
 import { getAgentEnvironment } from '@/lib/cli/spawn-cli';
 import logger from '@/lib/logger';
 import { syncTaskPr } from '@/lib/github/task-pr-sync';
+import { syncSessionPr } from '@/lib/github/session-pr-sync';
 import { flushGitPanelRecompute } from './git-panel-cache';
 import { flushRecompute } from './worktree-diff-stats-cache';
 
@@ -49,6 +50,10 @@ export async function refreshSessionDiffState(
   if (session.task_id) {
     const agentEnvironment = await getAgentEnvironment(userId);
     await runOperation('task_pr_status', syncTaskPr(session.task_id, { agentEnvironment }));
+  } else if (session.work_dir) {
+    // Bare sessions still want PR linkage when they're working in a real repo.
+    const agentEnvironment = await getAgentEnvironment(userId);
+    await runOperation('session_pr_status', syncSessionPr(sessionId, { agentEnvironment }));
   }
 }
 

@@ -95,6 +95,25 @@ export function resetGhAvailabilityCache(): void {
   ghAvailableCache.clear();
 }
 
+/**
+ * Resolve the worktree's current HEAD branch, or null if HEAD is detached
+ * or git fails. Used by callers that don't have a stored branch (bare
+ * sessions) but still want to drive `probeTaskPrStatus`.
+ */
+export async function resolveCurrentBranch(
+  workDir: string,
+  agentEnvironment: AgentEnvironment = 'native',
+): Promise<string | null> {
+  if (!workDir) return null;
+  const result = await execGitInDir(
+    ['rev-parse', '--abbrev-ref', 'HEAD'],
+    workDir,
+    agentEnvironment,
+  );
+  const head = result?.stdout.trim();
+  return head && head !== 'HEAD' ? head : null;
+}
+
 function normalizeGithubOwnerRepo(remoteUrl: string | null): string | null {
   if (!remoteUrl) return null;
   const trimmed = remoteUrl.trim();
