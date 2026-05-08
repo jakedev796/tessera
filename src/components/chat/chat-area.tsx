@@ -24,9 +24,10 @@ interface ChatAreaProps {
 export const ChatArea = memo(function ChatArea({ sessionId, panelId }: ChatAreaProps) {
   const { t } = useI18n();
   const tabId = useContext(TabIdContext);
-  const isTabActive = useTabStore((state) => state.activeTabId === tabId);
-  const isPanelActive = usePanelStore((state) => state.tabPanels[tabId]?.activePanelId === panelId);
-  const isViewActive = isTabActive && isPanelActive;
+  // Side-by-side panels in the active tab are all on-screen even though only
+  // one is the panel-store's "active" panel; gating autoscroll on isPanelActive
+  // froze the unfocused panel's viewport during streaming (issue #16).
+  const isViewActive = useTabStore((state) => state.activeTabId === tabId);
   const { windowedMessages, hasMore, loadMore, isLoadingMore } =
     useWindowedMessages(sessionId);
   const isSinglePanel = usePanelStore(
