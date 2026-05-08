@@ -230,9 +230,19 @@ export function useGitPanelController(sessionId: string | null) {
     if (typeof document === "undefined") return;
 
     const refreshOnVisible = () => {
-      if (document.visibilityState === "visible") {
-        void loadPanel({ silent: true });
+      if (document.visibilityState !== "visible") return;
+      // Ask the server to re-probe git state + PR status (covers work done
+      // outside Tessera — CLI push, external gh pr create, etc.). Don't await:
+      // the WS broadcast and the loadPanel re-read below converge the UI.
+      if (!isTransientSessionId(sessionId)) {
+        void fetch(
+          `/api/sessions/${encodeURIComponent(sessionId)}/refresh-git`,
+          { method: "POST" },
+        ).catch(() => {
+          // Best-effort — staleness recovers on the next focus or poll tick.
+        });
       }
+      void loadPanel({ silent: true });
     };
 
     document.addEventListener("visibilitychange", refreshOnVisible);

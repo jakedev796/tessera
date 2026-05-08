@@ -38,6 +38,11 @@ export type PrProbeResult =
        * when HEAD is detached or unresolvable.
        */
       resolvedBranch: string | null;
+    }
+  | {
+      kind: 'transient_error';
+      stderr: string;
+      resolvedBranch: string | null;
     };
 
 const ghAvailableCache = new Map<AgentEnvironment, boolean>();
@@ -191,8 +196,10 @@ export async function probeTaskPrStatus(params: {
       return { kind: 'unsupported', reason: 'gh_unauthenticated' };
     }
     logger.warn({ branch: probeBranch, ownerRepo, stderr: run.stderr.slice(0, 300) }, 'gh pr list failed');
-    // Transient failure — don't mark unsupported, just report no update.
-    return { kind: 'ok', prStatus: null, remoteBranchExists, resolvedBranch };
+    // Transient failure (network blip, rate limit, subprocess hiccup). Surface
+    // a distinct kind so callers can leave the previously-known PR state in the
+    // DB instead of overwriting it with null and broadcasting "PR gone".
+    return { kind: 'transient_error', stderr: run.stderr, resolvedBranch };
   }
 
   let payload: GhPrListItem[] = [];

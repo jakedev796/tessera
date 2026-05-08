@@ -12,7 +12,18 @@ import { SettingsManager } from '@/lib/settings/manager';
 import type { AgentEnvironment } from '@/lib/settings/types';
 import { syncAllEligibleTaskPrs } from './task-pr-sync';
 
-const POLL_INTERVAL_MS = 600_000; // 10 minutes
+// 60s strikes a balance between staleness and gh-CLI / GitHub-API load.
+// The probe coalesces in-flight requests per task and only writes the DB
+// (+ broadcasts) when something actually changed, so a tighter cadence
+// stays cheap. Overrides via TESSERA_PR_POLL_INTERVAL_MS for testing.
+const DEFAULT_POLL_INTERVAL_MS = 60_000;
+const POLL_INTERVAL_MS = (() => {
+  const raw = process.env.TESSERA_PR_POLL_INTERVAL_MS;
+  const parsed = raw ? Number.parseInt(raw, 10) : NaN;
+  return Number.isFinite(parsed) && parsed >= 5_000
+    ? parsed
+    : DEFAULT_POLL_INTERVAL_MS;
+})();
 
 class TaskPrPoller {
   private interval: NodeJS.Timeout | null = null;
