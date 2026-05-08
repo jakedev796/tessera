@@ -120,6 +120,13 @@ export function syncTaskPr(
         dbTasks.setTaskWorktreeBranch(taskId, probe.resolvedBranch);
       }
 
+      if (probe.kind === 'transient_error') {
+        // Leave the previously-known PR state alone — the next probe will
+        // settle it. Overwriting with null here is what made PR detection
+        // appear to lose tracked PRs intermittently.
+        return;
+      }
+
       const nextStatus = probe.prStatus ?? null;
       const nextRemoteExists = probe.remoteBranchExists;
       const prUnchanged =
